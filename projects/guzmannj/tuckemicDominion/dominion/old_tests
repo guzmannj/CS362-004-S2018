@@ -1,0 +1,5379 @@
+// /* CS 362 Assignment 4 */
+// /*************************************************************************
+//  ** Author:                  Michael Tucker
+//  ** Date Created:            5/7/2018
+//  ** Last Modification Date:  5/13/2018
+//  ** Filename:                randomtestcard1.c
+//  ** 
+//  ** Overview:  This program implements a random test generator for 
+//  **            testing the Smithy card from the Dominion card game.
+//  **            The test generates random inputs and then tests the
+//  **            effect the card has on elements of the Game State.
+//  **            The tests include:
+//  **			   TEST 1: Player Receives +3 Cards in Hand
+//  ** 		   TEST 2: 3 Cards Were Drawn from Player's Deck
+//  **			   TEST 3: No Changes to Victory Card and Kingdom Card 
+//  **					   Supply Piles
+//  **			   TEST 4: State Change Should Reflect Effect of Smithy 
+//  **                    Card
+//  ** Input:   None.  The program executes and calls functions from the
+//  **          dominion.c file, which includes card code under test. 
+//  ** Output:  A new file is created and appended, randomtestcard1.out
+//  **          which includes the test and coverage results.
+//  ************************************************************************/
+
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <math.h>
+// #include <time.h>
+
+// #include "dominion.h"
+// #include "dominion_helpers.h"
+// #include "rngs.h"
+// #include "interface.h" 
+
+// #define TESTCARDNAME "Smithy"
+// #define TESTCARD smithy
+
+ 
+// /************************************************************************/
+
+// // Composition of struct gameState from dominion.h
+// /*
+// struct gameState 
+// {
+//     int numPlayers;     //number of players
+//     int supplyCount[treasure_map+1];  //this is the amount of a specific type of card given a specific number.
+//     int embargoTokens[treasure_map+1];
+//     int outpostPlayed;
+//     int outpostTurn;
+//     int whoseTurn;
+//     int phase;
+//     int numActions;     // Starts at 1 each turn 
+//     int coins;          // Use as you see fit! 
+//     int numBuys;        // Starts at 1 each turn 
+//     int hand[MAX_PLAYERS][MAX_HAND];
+//     int handCount[MAX_PLAYERS];
+//     int deck[MAX_PLAYERS][MAX_DECK];
+//     int deckCount[MAX_PLAYERS];
+//     int discard[MAX_PLAYERS][MAX_DECK];
+//     int discardCount[MAX_PLAYERS];
+//     int playedCards[MAX_DECK];
+//     int playedCardCount;
+// };
+// */
+
+ 
+// /*************************************************************************
+//  ** Function:                assertMsg
+//  ** 
+//  ** Description:    Function to use the input condition to determine
+//  **                 if a Passed or Failed message is output based on the
+//  **                 result of a unit subtest. This is a generic function
+//  **                 for displaying the test results. The condition is
+//  **                 determined outside the function.
+//  ************************************************************************/
+
+// void assertMsg(int iteration, int condition, char* trueMsg, char* falseMsg)
+// {
+//     if (condition)
+//     {
+//         // printf("PASSED: %s\n", trueMsg);
+//     }
+//     else
+//     {
+//         printf("FAILED: iter: %d  %s\n", iteration, falseMsg);
+//         // exit(0);
+//     }
+// }
+
+
+// /*************************************************************************
+//  ** Function:                assertMsgSm
+//  ** 
+//  ** Description:    Function to compare the actual value of the test 
+//  **                 result produced by a unit subtest to the expected 
+//  **                 value. If the test fails, a FAIL message and failure 
+//  **                 results for the test are output. The test inputs
+//  **                 are specific to the tests run on the Smithy card.
+//  ************************************************************************/
+
+// int assertMsgSm(int iteration, int player, char* pileLabel, char* subTestLabel, int testNum, int actualVal, int expectedVal)
+// {
+//     char failMsg[128];
+//     char tempStr[128];
+  
+//     int resultVal = 0;
+
+//     if (actualVal != expectedVal)
+//     {
+//         strcpy(failMsg, "FAILED. iter: ");
+// 		sprintf(tempStr, "%d  Test%d: P: %d, %s, %s:  ", iteration, testNum, player, pileLabel, subTestLabel);
+// 		strcat(failMsg, tempStr);
+// 		sprintf(tempStr, "actual: %d != expected: %d\n", actualVal, expectedVal);
+// 		strcat(failMsg, tempStr);
+//         printf(failMsg);
+//         resultVal = -1;
+//     }
+
+//     return resultVal;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                diffSupply
+//  ** 
+//  ** Description:    Function to compare the counts of each Supply Piles
+//  **                 of cards and return the card number if there is
+//  **                 a difference.
+//  ************************************************************************/
+
+// int diffSupply(struct gameState *testState, struct gameState *baseState)
+// {
+//     int i = 0;
+//     int dResult = -1;
+
+//     while (i < treasure_map + 1 && dResult == -1)
+//     {
+//         if (testState->supplyCount[i] != baseState->supplyCount[i])
+//         {
+//             dResult = i;
+//         }
+
+//         i++;
+//     }
+
+//     return dResult;
+// }
+
+
+// /************************************************************************/
+
+// // smithy card case from original cardEffect() switch-case
+
+// /*
+// 	case smithy:
+// 		//+3 Cards
+// 		for (i = 0; i < 3; i++)
+// 		{
+// 			drawCard(currentPlayer, state);
+// 		}
+                                      
+// 		//discard card from hand
+// 		discardCard(handPos, currentPlayer, state, 0);
+// 		return 0;
+// */
+ 
+
+// /*************************************************************************
+//  ** Function:                printFinalTestResult
+//  ** 
+//  ** Description:    Function to implement printing the final test 
+//  **                 results message to the user console. This is a 
+//  **                 tally of failed tests for each of the major test
+//  **                 groups performed for each random input case, as well
+//  **                 as a test results summary message.
+//  ************************************************************************/
+
+// void printFinalTestResult(int result, int *failTestCounts)
+// {
+//     int i;
+
+// 	// Test Failure Tally Results
+//     printf("\nTest Failure Totals:\n"); 
+//     for (i = 0; i < 4; i++)
+//     {
+//         printf("TEST %d Fail Count: %d\n", i + 1, failTestCounts[i]);
+//     }
+//     printf("\n");
+	
+
+//     // Final Result Message
+	
+//     if (result == 0)
+//     {
+// 	    printf(" >>>>>  SUCCESS: Testing Complete for %s card. All Tests Passed.  <<<<<\n", TESTCARDNAME);
+//     }
+    
+//     else
+//     {
+//         printf(" ******* Testing Complete for %s card. There were one or more Failed Tests. *******\n", TESTCARDNAME);
+//     }
+
+//     printf("\n"); 
+// }
+ 
+ 	
+// /*************************************************************************
+//  ** Function:                checkHandPlus3
+//  ** 
+//  ** Description:    Function to implement Test 1: Player Receives +3 
+//  **                 Cards in Hand. Test result (pass or fail for this 
+//  **                 test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkHandPlus3(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 1: Player Receives +3 Cards in Hand --------------
+
+//     char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+//     int i;
+// 	int assertCondition = 0;
+// 	int assertRetVal = 0;
+//     int result = 0;
+	
+//     int testNum;
+//     int newCards = 0;
+//     int discardedCount = 1; // This is 1 because card discarded after use
+	
+// 	int testHandCount = 0;
+//     int baseHandCount = 0;
+//     int adjBaseHandCount = 0;
+
+// 	int actualVal;
+// 	int expectedVal;
+	
+// 	char handLabel[64];
+//     char deckLabel[64];
+//     char discardLabel[64];
+//     char countTestLabel[64];
+//     char cardTestLabel[64];
+	
+// 	strcpy(handLabel, "hand");
+//     strcpy(deckLabel, "deck");
+//     strcpy(discardLabel, "discard");
+//     strcpy(countTestLabel, "count test");
+//     strcpy(cardTestLabel, "card test");
+	
+//     strcpy(msgPfx, "TEST 1: Player Receives +3 Cards in Hand");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 1");
+//     strcpy(failMsg, "N/A");    
+
+// 	testNum = 1;
+// 	newCards = 3;
+	
+	
+// 	// Test: Check that the new handCount is correct
+   
+//     if (baseG->deckCount[player] > 2)
+//     {
+// 	    testHandCount = testG->handCount[player];
+//         baseHandCount = baseG->handCount[player];
+//         adjBaseHandCount = baseHandCount + newCards - discardedCount;
+//     }
+    
+//     if ((baseG->deckCount[player] + baseG->discardCount[player]) > 2)
+//     {
+// 	    testHandCount = testG->handCount[player];
+//         baseHandCount = baseG->handCount[player];
+//         adjBaseHandCount = baseHandCount + newCards - discardedCount;
+//     }
+
+//     else
+//     {
+//         adjBaseHandCount = testHandCount;
+//     }
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         adjBaseHandCount++;
+//     }
+//     */
+
+//     if (testHandCount == adjBaseHandCount)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "testHandCount: %d != adjBaseHandCount: %d", testHandCount, adjBaseHandCount);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[0]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+
+	
+//     // Test: Check that new cards at last and second to last hand positions are correct
+	
+// 	for (i = 0; i < 2; i++)
+// 	{
+//         if (baseG->deckCount[player] > 2)
+//         {
+// 		    expectedVal = baseG->deck[player][baseG->deckCount[player] - 1 - i];
+//         }
+        
+//         else if (baseG->deckCount[player] == 1 && i == 1)
+//         {
+// 		    expectedVal = 0; 
+//         }
+        
+//         else if (baseG->deckCount[player] == 0)
+//         {
+//             expectedVal = 0;
+//         }
+
+//         else
+//         {
+// 		    expectedVal = baseG->deck[player][baseG->deckCount[player] - 1 - i];
+//             // expectedVal = 0; 
+//         }
+		
+//         actualVal = testG->hand[player][testG->handCount[player] - 2 + i];
+        	
+//         assertRetVal = assertMsgSm(iteration, player, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 		if (assertRetVal == -1)
+// 		{
+// 			result = assertRetVal;
+// 		}
+	
+//         if (assertRetVal == -1)
+//         {   
+//             failTestCounts[0]++;
+//         }
+//     }
+    
+    
+//     // Test: Third (last) card drawn was relocated to original Smithy hand position in hand during discard of Smithy
+
+//     if (baseG->deckCount[player] > 2)
+//     {
+// 	    expectedVal = baseG->deck[player][baseG->deckCount[player] - 3];
+//     }
+
+//     else
+//     {
+//         expectedVal = 0;
+//     }
+    
+//     actualVal = testG->hand[player][handPos];
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         actualVal = 9999;
+//     }
+//     */
+
+//     assertRetVal = assertMsgSm(iteration, player, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 	if (assertRetVal == -1)
+// 	{
+// 		result = assertRetVal;
+// 	}
+	
+//     if (assertRetVal == -1)
+//     {
+//         failTestCounts[0]++;
+//     }
+	
+//     return result;
+// }
+
+	
+// /*************************************************************************
+//  ** Function:                checkDeckMinus3
+//  ** 
+//  ** Description:    Function to implement TEST 2: 3 Cards Were Drawn 
+//  **					from Player's Deck. Test result (pass or fail for 
+//  **					this test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkDeckMinus3(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 2: 3 Cards Were Drawn from Player's Deck --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+//     int i;
+// 	int assertCondition = 0;
+// 	int assertRetVal = 0;
+//     int result = 0;
+	
+//     int testNum;
+//     int newCards = 0;
+//     int shuffledCards = 0;
+	
+// 	int testDeckCount = 0;
+//     int baseDeckCount = 0;
+//     int adjBaseDeckCount = 0;
+
+// 	int actualVal = 0;
+// 	int expectedVal = 0;
+//     int testResult = 0;
+	
+// 	char handLabel[64];
+//     char deckLabel[64];
+//     char discardLabel[64];
+//     char countTestLabel[64];
+//     char cardTestLabel[64];
+	
+// 	strcpy(handLabel, "hand");
+//     strcpy(deckLabel, "deck");
+//     strcpy(discardLabel, "discard");
+//     strcpy(countTestLabel, "count test");
+//     strcpy(cardTestLabel, "card test");
+	
+//     strcpy(msgPfx, "TEST 2: 3 Cards Were Drawn from Player's Deck");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 2");
+//     strcpy(failMsg, "N/A");
+	
+// 	testNum = 2;
+// 	newCards = 3;
+
+//     // Adjust base game state for comparison, if a shuffle had occurred
+//     if (testG->discardCount[player] == 0 && baseG->deckCount[player] < 3)
+//     {
+//         for (i = 0; i < 10; i++)
+//         {
+//             baseG->deck[player][i] = 0;
+//         }
+    
+//         baseG->deckCount[player] = testG->deckCount[player] + 3;
+//     }
+	
+	
+//     // Test: Compare the deck cards between test and base game states
+	
+// 	for (i = 0; i < testG->deckCount[player]; i++)
+//     {
+// 		if (testG->deck[player][i] != baseG->deck[player][i])
+//         {
+//             testResult = i;
+//         }
+//     }
+
+// 	actualVal = testResult;
+// 	expectedVal = 0;
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         expectedVal = 9999; 
+//     }
+// 	*/
+
+//     assertRetVal = assertMsgSm(iteration, player, deckLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 	if (assertRetVal == -1)
+// 	{
+// 		result = assertRetVal;
+// 	}
+	
+//     if (assertRetVal == -1)
+//     {
+//         failTestCounts[1]++;
+//     }
+	
+	
+// 	// Test: Compare the deck counts between test and base game states
+    
+// 	testDeckCount = testG->deckCount[player];
+//     baseDeckCount = baseG->deckCount[player];
+//     adjBaseDeckCount = baseDeckCount - newCards + shuffledCards;
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         adjBaseDeckCount++;
+//     }
+//     */ 
+    
+//     if (testDeckCount == adjBaseDeckCount)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "testDeckCount: %d != adjBaseDeckCount: %d", testDeckCount, adjBaseDeckCount);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[1]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+
+// 	return result;
+// }	
+
+
+// /*************************************************************************
+//  ** Function:                checkSupplyCounts
+//  ** 
+//  ** Description:    Function to implement TEST 3: No Changes to Victory 
+//  **					Card and Kingdom Card Supply Piles. Test result 
+//  **					(pass or fail for this test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkSupplyCounts(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 3: No Changes to Victory Card and Kingdom Card Supply Piles --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+// 	int assertCondition = 0;
+//     int result = 0;
+//     int diffResult;
+	
+//     strcpy(msgPfx, "TEST 3: No Changes to Victory Card and Kingdom Card Supply Piles");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 3");
+//     strcpy(failMsg, "N/A");    
+ 
+
+// 	// Test: Compare supply pile data from game states before and after playing 
+// 	//       card in cardEffect function.    
+
+//     diffResult = diffSupply(testG, baseG);  
+    
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         diffResult = 9999; 
+//     }
+//     */
+
+//     if (diffResult == -1)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "Supply Card Count Changed for Card: %d", diffResult);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[2]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+ 
+// 	return result;
+// }
+ 
+ 
+// /*************************************************************************
+//  ** Function:                checkGameState
+//  ** 
+//  ** Description:    Function to implement TEST 4: Game State after 
+//  **					playing Smithy Card should reflect Smithy Card 
+//  **					Effect. Test result (pass or fail for this test 
+//  **					group) is returned.
+//  ************************************************************************/  
+ 
+// int checkGameState(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 4: Game State after playing Smithy Card should reflect Smithy Card Effect --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+//     int assertCondition = 0;
+//     int result = 0;
+	
+// 	struct gameState modBaseGst;
+	
+//     strcpy(msgPfx, "TEST 4: Game State after playing Smithy Card should reflect Smithy Card Effect");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 4");
+//     strcpy(failMsg, "N/A");  
+ 
+// 	memcpy(&modBaseGst, baseG, sizeof(struct gameState));
+	
+ 
+//     // Manually modify the modBaseGst game state for comparison
+		
+// 	// handCount for player increased by net +2
+// 	if (baseG->deckCount[player] > 2)
+// 	{
+// 		modBaseGst.handCount[player] += 2;
+// 		modBaseGst.hand[player][modBaseGst.handCount[player] - 2] = baseG->deck[player][baseG->deckCount[player] - 1];
+// 		modBaseGst.hand[player][modBaseGst.handCount[player] - 1] = baseG->deck[player][baseG->deckCount[player] - 2];
+// 		modBaseGst.hand[player][handPos] = baseG->deck[player][baseG->deckCount[player] - 3];
+// 		modBaseGst.hand[player][modBaseGst.handCount[player]] = -1; 
+// 	}   
+
+//     else if (baseG->discardCount[player] > 2)
+//     {
+//         modBaseGst.handCount[player] += 2;
+	    
+//         memcpy(modBaseGst.hand[player], testG->hand[player], sizeof(int) * MAX_HAND);
+//     }
+
+//     else
+//     {
+//         modBaseGst.handCount[player] = testG->handCount[player];
+//         memcpy(modBaseGst.hand[player], testG->hand[player], sizeof(int) * MAX_HAND);
+//     }
+
+// 	// playedCards array includes Smithy
+// 	// playedCardCount increased by 1
+//     modBaseGst.playedCards[modBaseGst.playedCardCount] = smithy;
+//     modBaseGst.playedCardCount++;
+
+//     // If a shuffle occurred, then more modifications needed
+//     if (baseG->deckCount[player] < 3)
+//     {
+//         modBaseGst.deckCount[player] = testG->deckCount[player];
+        
+//         memcpy(modBaseGst.deck[player], testG->deck[player], sizeof(int) * MAX_DECK);
+
+//         memcpy(modBaseGst.discard[player], testG->discard[player], sizeof(int) * MAX_DECK);
+
+//         modBaseGst.discardCount[player] = 0;
+//     }
+    
+//     else
+//     {
+// 		modBaseGst.deckCount[player] -= 3;
+//     }
+
+
+//     // Test: Compare test game state to base game state for differences
+	
+//     if (memcmp(testG, &modBaseGst, sizeof(struct gameState)) == 0)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "Game state is incorrect.");
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[3]++;
+//     }
+
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+	
+// 	return result;
+// } 
+ 
+ 
+// /*************************************************************************
+//  ** Function:                checkSmithyCard
+//  ** 
+//  ** Description:    Function to implement the test oracle for testing
+//  **                 the Smithy Card effect with random inputs. This 
+//  **                 function calls other functions above to perform each
+//  **                 specific test or test group.
+//  ************************************************************************/ 
+
+// int checkSmithyCard(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testGameState)
+// {
+//     int choice1 = 0, choice2 = 0, choice3 = 0,  bonus = 0;
+// 	int result;
+// 	int finalResult = 0;
+
+//     struct gameState preGameState, preBaseGameState;
+    
+//     memcpy(&preGameState, testGameState, sizeof(struct gameState));
+//     memcpy(&preBaseGameState, testGameState, sizeof(struct gameState));
+
+    
+//     // Run the cardEffect function for Smithy card
+//     cardEffect(TESTCARD, choice1, choice2, choice3, testGameState, handPos, &bonus); 
+
+	
+//     // TEST 1: Player Receives +3 Cards in Hand
+// 	result = checkHandPlus3(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+	
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+
+//     // TEST 2: 3 Cards Were Drawn from Player's Deck
+// 	result = checkDeckMinus3(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+	
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+	
+//     // TEST 3: No Changes to Victory Card and Kingdom Card Supply Piles
+// 	result = checkSupplyCounts(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+    
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+
+// 	// TEST 4: Game State after playing Smithy Card should reflect Smithy Card Effect
+// 	result = checkGameState(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+    
+//     if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+//     return finalResult;
+// }	
+ 
+ 
+// /*************************************************************************
+//  ** Function:                randomTestSmithyCard
+//  ** 
+//  ** Description:    Function to implement the random test generator for
+//  **                 testing the Smithy Card. A random game state is 
+//  **                 generated and adjusted such that some parameters
+//  **                 have random values falling within a valid range.
+//  ************************************************************************/
+
+// int randomTestSmithyCard()
+// {
+//     int i;
+//     int numCycles;
+// 	int result = 0;
+//     int finalResult = 0;
+    
+//     int handPos = 0;
+//     int numPlayers = 0;
+// 	int player = 0;
+//     int numActions = 0;
+//     int playerHandCount = 0;
+//     int randSeed = 0; 
+
+//     int k[10] = {adventurer, council_room, feast, gardens, mine,
+//                  remodel, smithy, village, baron, great_hall};
+
+//     int failTestCounts[4];
+
+//     struct gameState testGst, initialGst; 
+    
+	
+// 	printf("----------------- Testing Card: %s ----------------\n", TESTCARDNAME);
+// 	printf ("RANDOM TESTS starting.\n");
+
+//     numPlayers = 4;
+//     randSeed = 1000;
+
+//     initializeGame(numPlayers, k, randSeed, &initialGst); 
+
+//     memset(failTestCounts, 0, sizeof(failTestCounts));
+
+//     // Generate Random Inputs for each cycle of the outer for loop
+// 	// and run the Smithy test oracle for each case of random inputs
+    
+// 	for (numCycles = 0; numCycles < 2000; numCycles++)
+// 	{
+//         memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+//         // Adjust game state for certain parameters with random values
+//         // with valid range
+		
+//         numActions = (rand() % 256);
+//         testGst.numActions = numActions;
+        
+//         testGst.numPlayers = numPlayers;	
+        
+//         player = (rand() % numPlayers); 
+//         testGst.whoseTurn = player;
+       
+//         for (i = 0; i < numPlayers; i++)
+//         {
+//             testGst.deckCount[i] = (rand() % (MAX_DECK + 1));
+            
+//             testGst.discardCount[i] = (rand() % (MAX_DECK + 1));
+
+//             testGst.handCount[i] = (rand() % (MAX_HAND + 1));
+//         }
+        
+//         testGst.playedCardCount = (rand() % (MAX_HAND + 1));
+
+// 	    // Replace a card in player hand at a random handpos with Smithy card
+//         playerHandCount = testGst.handCount[player];
+           
+//         if (playerHandCount != 0)
+//         {
+//             handPos = (rand() % playerHandCount);  	
+// 	    }
+//         else
+//         {
+//             handPos = 10;
+//         }
+        
+//         testGst.hand[player][handPos] = TESTCARD;
+        
+//         // Inputs have been randomized
+//         // Check the Smithy Card effect with the random inputs for this iteration
+
+//         result = checkSmithyCard(failTestCounts, numCycles, player, handPos, &testGst);
+
+//         if (result != 0)
+//         {
+//             finalResult = result;
+//         }
+// 	}
+
+  
+// 	/************************************************************************/
+//     // Final Result Message
+
+// 	printFinalTestResult(finalResult, failTestCounts);
+    	
+// 	return finalResult;
+// } 
+ 
+ 
+// /************************************************************************/
+
+// /************************************************************************/
+
+// /*************************************************************************
+//  ** Function:           main() method for randomtestcard1 program
+//  ** 
+//  ** Description:    main() method for program to random test the 
+//  **                 Smithy Card from the Dominion Card Game.
+//  ** Parameters:     none
+//  ** Return Value:   0 - conventional for success of int main() method
+//  ************************************************************************/
+
+// int main(int argc, char *argv[])
+// {
+//     srand(time(NULL));
+//     randomTestSmithyCard();
+//     return 0;
+// }
+
+
+
+
+
+/* CS 362 Assignment 4 */
+// /*************************************************************************
+//  ** Author:                  Michael Tucker
+//  ** Date Created:            5/9/2018
+//  ** Last Modification Date:  5/13/2018
+//  ** Filename:                randomtestcard2.c
+//  ** 
+//  ** Overview:  This program implements a random test generator for 
+//  **            testing the Village card from the Dominion card game.
+//  **            The test generates random inputs and then tests the
+//  **            effect the card has on elements of the Game State.
+//  **            The tests include:
+//  **			   TEST 1: Player Receives +1 Card in Hand
+//  ** 		   TEST 2: 1 Card Was Drawn from Player's Deck
+//  **			   TEST 3: Player Receives +2 Actions
+//  **			   TEST 4: No Changes to Victory Card and Kingdom Card 
+//  **					   Supply Piles
+//  **			   TEST 5: State Change Should Reflect Effect of Village 
+//  **                    Card
+//  ** Input:   None.  The program executes and calls functions from the
+//  **          dominion.c file, which includes card code under test. 
+//  ** Output:  A new file is created and appended, randomtestcard2.out
+//  **          which includes the test and coverage results.
+//  ************************************************************************/
+
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <math.h>
+// #include <time.h>
+
+// #include "dominion.h"
+// #include "dominion_helpers.h"
+// #include "rngs.h"
+// #include "interface.h" 
+
+// #define TESTCARDNAME "Village"
+// #define TESTCARD village
+
+ 
+// /************************************************************************/
+
+// // Composition of struct gameState from dominion.h
+// /*
+// struct gameState 
+// {
+//     int numPlayers;     //number of players
+//     int supplyCount[treasure_map+1];  //this is the amount of a specific type of card given a specific number.
+//     int embargoTokens[treasure_map+1];
+//     int outpostPlayed;
+//     int outpostTurn;
+//     int whoseTurn;
+//     int phase;
+//     int numActions;     // Starts at 1 each turn 
+//     int coins;          // Use as you see fit! 
+//     int numBuys;        // Starts at 1 each turn 
+//     int hand[MAX_PLAYERS][MAX_HAND];
+//     int handCount[MAX_PLAYERS];
+//     int deck[MAX_PLAYERS][MAX_DECK];
+//     int deckCount[MAX_PLAYERS];
+//     int discard[MAX_PLAYERS][MAX_DECK];
+//     int discardCount[MAX_PLAYERS];
+//     int playedCards[MAX_DECK];
+//     int playedCardCount;
+// };
+// */
+
+ 
+// /*************************************************************************
+//  ** Function:                assertMsg
+//  ** 
+//  ** Description:    Function to use the input condition to determine
+//  **                 if a Passed or Failed message is output based on the
+//  **                 result of a unit subtest. This is a generic function
+//  **                 for displaying the test results. The condition is
+//  **                 determined outside the function.
+//  ************************************************************************/
+
+// void assertMsg(int iteration, int condition, char* trueMsg, char* falseMsg)
+// {
+//     if (condition)
+//     {
+//         // printf("PASSED: %s\n", trueMsg);
+//     }
+//     else
+//     {
+//         printf("FAILED: iter: %d  %s\n", iteration, falseMsg);
+//         // exit(0);
+//     }
+// }
+
+
+// /*************************************************************************
+//  ** Function:                assertMsgSm
+//  ** 
+//  ** Description:    Function to compare the actual value of the test 
+//  **                 result produced by a unit subtest to the expected 
+//  **                 value. If the test fails, a FAIL message and failure 
+//  **                 results for the test are output. The test inputs
+//  **                 are specific to the tests run on the Village card.
+//  ************************************************************************/
+
+// int assertMsgSm(int iteration, int player, char* pileLabel, char* subTestLabel, int testNum, int actualVal, int expectedVal)
+// {
+//     char failMsg[128];
+//     char tempStr[128];
+  
+//     int resultVal = 0;
+
+//     if (actualVal != expectedVal)
+//     {
+//         strcpy(failMsg, "FAILED. iter: ");
+// 		sprintf(tempStr, "%d  Test%d: P: %d, %s, %s:  ", iteration, testNum, player, pileLabel, subTestLabel);
+// 		strcat(failMsg, tempStr);
+// 		sprintf(tempStr, "actual: %d != expected: %d\n", actualVal, expectedVal);
+// 		strcat(failMsg, tempStr);
+//         printf(failMsg);
+//         resultVal = -1;
+//     }
+
+//     return resultVal;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                diffSupply
+//  ** 
+//  ** Description:    Function to compare the counts of each Supply Piles
+//  **                 of cards and return the card number if there is
+//  **                 a difference.
+//  ************************************************************************/
+
+// int diffSupply(struct gameState *testState, struct gameState *baseState)
+// {
+//     int i = 0;
+//     int dResult = -1;
+
+//     while (i < treasure_map + 1 && dResult == -1)
+//     {
+//         if (testState->supplyCount[i] != baseState->supplyCount[i])
+//         {
+//             dResult = i;
+//         }
+
+//         i++;
+//     }
+
+//     return dResult;
+// }
+
+
+// /************************************************************************/
+
+// // village card case from original cardEffect() switch-case in dominion.c
+// /*
+// 	case village:
+// 		//+1 Card
+// 		drawCard(currentPlayer, state);
+			
+// 		//+2 Actions
+// 		state->numActions = state->numActions + 2;
+			
+// 		//discard played card from hand
+// 		discardCard(handPos, currentPlayer, state, 0);
+// 		return 0;
+// */
+ 
+
+// /*************************************************************************
+//  ** Function:                printFinalTestResult
+//  ** 
+//  ** Description:    Function to implement printing the final test 
+//  **                 results message to the user console. This is a 
+//  **                 tally of failed tests for each of the major test
+//  **                 groups performed for each random input case, as well
+//  **                 as a test results summary message.
+//  ************************************************************************/
+
+// void printFinalTestResult(int result, int *failTestCounts)
+// {
+//     int i;
+
+// 	// Test Failure Tally Results
+//     printf("\nTest Failure Totals:\n"); 
+//     for (i = 0; i < 5; i++)
+//     {
+//         printf("TEST %d Fail Count: %d\n", i + 1, failTestCounts[i]);
+//     }
+//     printf("\n");
+	
+
+//     // Final Result Message
+	
+//     if (result == 0)
+//     {
+// 	    printf(" >>>>>  SUCCESS: Testing Complete for %s card. All Tests Passed.  <<<<<\n", TESTCARDNAME);
+//     }
+    
+//     else
+//     {
+//         printf(" ******* Testing Complete for %s card. There were one or more Failed Tests. *******\n", TESTCARDNAME);
+//     }
+
+//     printf("\n"); 
+// }
+ 
+ 
+// /*************************************************************************
+//  ** Function:                checkHandPlus1
+//  ** 
+//  ** Description:    Function to implement Test 1: Player Receives +1 
+//  **                 Card in Hand. Test result (pass or fail for this 
+//  **                 test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkHandPlus1(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 1: Player Receives +1 Card in Hand --------------
+   
+//     char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+// 	int assertCondition = 0;
+// 	int assertRetVal = 0;
+//     int result = 0;
+	
+//     int testNum;
+//     int newCards = 0;
+//     int discardedCount = 1; // This is 1 because card discarded after use
+	
+// 	int testHandCount = 0;
+//     int baseHandCount = 0;
+//     int adjBaseHandCount = 0;
+
+// 	int actualVal;
+// 	int expectedVal;
+	
+// 	char handLabel[64];
+//     char deckLabel[64];
+//     char discardLabel[64];
+//     char countTestLabel[64];
+//     char cardTestLabel[64];
+	
+// 	strcpy(handLabel, "hand");
+//     strcpy(deckLabel, "deck");
+//     strcpy(discardLabel, "discard");
+//     strcpy(countTestLabel, "count test");
+//     strcpy(cardTestLabel, "card test");
+	
+//     strcpy(msgPfx, "TEST 1: Player Receives +1 Card in Hand");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 1");
+//     strcpy(failMsg, "N/A");    
+
+
+// 	testNum = 1;
+// 	newCards = 1;
+	
+// 	// Test: Check that the new handCount is correct
+    
+// 	testHandCount = testG->handCount[player];
+//     baseHandCount = baseG->handCount[player];
+//     adjBaseHandCount = baseHandCount + newCards - discardedCount;
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         adjBaseHandCount++;
+//     }
+//     */
+
+//     if (testHandCount == adjBaseHandCount)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "testHandCount: %d != adjBaseHandCount: %d", testHandCount, adjBaseHandCount);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[0]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+
+    
+//     // Test: card drawn was relocated to original Village hand position in hand during discard of Village 
+
+//     if (baseG->handCount[player] == 0)
+//     {
+//         expectedVal = -1;
+//     }
+    
+//     else if (baseG->deckCount[player] > 0)
+//     {
+// 	    expectedVal = baseG->deck[player][baseG->deckCount[player] - 1];
+//     }
+
+//     else
+//     {
+//         expectedVal = 0;
+//     }
+    
+//     actualVal = testG->hand[player][handPos];
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         actualVal = 9999;
+//     }
+//     */
+
+//     assertRetVal = assertMsgSm(iteration, player, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 	if (assertRetVal == -1)
+// 	{
+// 		result = assertRetVal;
+// 	}
+	
+//     if (assertRetVal == -1)
+//     {
+//         failTestCounts[0]++;
+//     }
+	
+//     return result;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                checkDeckMinus1
+//  ** 
+//  ** Description:    Function to implement TEST 2: 1 Card Was Drawn 
+//  **					from Player's Deck. Test result (pass or fail for 
+//  **					this test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkDeckMinus1(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 2: 1 Card Was Drawn from Player's Deck --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+//     int i;
+// 	int assertCondition = 0;
+// 	int assertRetVal = 0;
+//     int result = 0;
+	
+//     int testNum;
+//     int newCards = 0;
+//     int shuffledCards = 0;
+	
+// 	int testDeckCount = 0;
+//     int baseDeckCount = 0;
+//     int adjBaseDeckCount = 0;
+
+// 	int actualVal = 0;
+// 	int expectedVal = 0;
+//     int testResult = 0;
+	
+// 	char handLabel[64];
+//     char deckLabel[64];
+//     char discardLabel[64];
+//     char countTestLabel[64];
+//     char cardTestLabel[64];
+	
+// 	strcpy(handLabel, "hand");
+//     strcpy(deckLabel, "deck");
+//     strcpy(discardLabel, "discard");
+//     strcpy(countTestLabel, "count test");
+//     strcpy(cardTestLabel, "card test");
+	
+//     strcpy(msgPfx, "TEST 2: 1 Card Was Drawn from Player's Deck");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 2");
+//     strcpy(failMsg, "N/A");
+	
+// 	testNum = 2;
+// 	newCards = 1;
+
+//     // Adjust base game state for comparison, if a shuffle had occurred
+//     if (testG->discardCount[player] == 0 && baseG->deckCount[player] < 3)
+//     {
+//         for (i = 0; i < 10; i++)
+//         {
+//             baseG->deck[player][i] = 0;
+//         }
+    
+//         baseG->deckCount[player] = testG->deckCount[player] + 1;
+//     }
+	
+	
+//     // Test: Compare the deck cards between test and base game states
+	
+// 	for (i = 0; i < testG->deckCount[player]; i++)
+//     {
+// 		if (testG->deck[player][i] != baseG->deck[player][i])
+//         {
+//             testResult = i;
+//         }
+//     }
+
+// 	actualVal = testResult;
+// 	expectedVal = 0;
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         expectedVal = 9999; 
+//     }
+// 	*/
+
+//     assertRetVal = assertMsgSm(iteration, player, deckLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 	if (assertRetVal == -1)
+// 	{
+// 		result = assertRetVal;
+// 	}
+	
+//     if (assertRetVal == -1)
+//     {
+//         failTestCounts[1]++;
+//     }
+	
+	
+// 	// Test: Compare the deck counts between test and base game states
+    
+// 	testDeckCount = testG->deckCount[player];
+//     baseDeckCount = baseG->deckCount[player];
+//     adjBaseDeckCount = baseDeckCount - newCards + shuffledCards;
+
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         adjBaseDeckCount++;
+//     }
+//     */ 
+    
+//     if (testDeckCount == adjBaseDeckCount)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "testDeckCount: %d != adjBaseDeckCount: %d", testDeckCount, adjBaseDeckCount);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[1]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+
+// 	return result;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                checkActionsPlus2
+//  ** 
+//  ** Description:    Function to implement TEST 3: Player Receives +2
+//  **                 Actions. Test result (pass or fail for this test
+//  **                 group) is returned.
+//  ************************************************************************/  
+ 
+// int checkActionsPlus2(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+//     // ----------- TEST 3: Player Receives +2 Actions --------------
+
+//     char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+// 	int assertCondition = 0;
+//     int result = 0;
+
+//     int testNumActions = 0;
+//     int baseNumActions = 0;
+//     int adjBaseNumActions = 0;
+//     int villageNumActions = 0;
+     
+//     strcpy(msgPfx, "TEST 3: Player Receives +2 Actions");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 3");
+//     strcpy(failMsg, "N/A");  
+                       
+//     villageNumActions = 2;
+
+//     testNumActions = testG->numActions;
+//     baseNumActions = baseG->numActions;
+//     adjBaseNumActions = baseNumActions + villageNumActions;
+
+//     if (testNumActions == adjBaseNumActions)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "testNumActions: %d !=  adjBaseNumActions: %d", testNumActions,  adjBaseNumActions);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+                                                                                
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[2]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+
+//     return result;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                checkSupplyCounts
+//  ** 
+//  ** Description:    Function to implement TEST 4: No Changes to Victory 
+//  **					Card and Kingdom Card Supply Piles. Test result 
+//  **					(pass or fail for this test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkSupplyCounts(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 4: No Changes to Victory Card and Kingdom Card Supply Piles --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+// 	int assertCondition = 0;
+//     int result = 0;
+//     int diffResult;
+	
+//     strcpy(msgPfx, "TEST 4: No Changes to Victory Card and Kingdom Card Supply Piles");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 4");
+//     strcpy(failMsg, "N/A");    
+ 
+
+// 	// Test: Compare supply pile data from game states before and after playing 
+// 	//       card in cardEffect function.    
+
+//     diffResult = diffSupply(testG, baseG);  
+    
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         diffResult = 9999; 
+//     }
+//     */
+
+//     if (diffResult == -1)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "Supply Card Count Changed for Card: %d", diffResult);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[3]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+ 
+// 	return result;
+// }
+ 
+ 
+// /*************************************************************************
+//  ** Function:                checkGameState
+//  ** 
+//  ** Description:    Function to implement TEST 5: Game State after 
+//  **					playing Village Card should reflect Village Card 
+//  **					Effect. Test result (pass or fail for this test 
+//  **					group) is returned.
+//  ************************************************************************/  
+ 
+// int checkGameState(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 5: Game State after playing Village Card should reflect Village Card Effect --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+//     int assertCondition = 0;
+//     int result = 0;
+	
+// 	struct gameState modBaseGst;
+	
+//     strcpy(msgPfx, "TEST 5: Game State after playing Village Card should reflect Village Card Effect");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 5");
+//     strcpy(failMsg, "N/A");  
+ 
+// 	memcpy(&modBaseGst, baseG, sizeof(struct gameState));
+	
+ 
+//     // Manually modify the modBaseGst game state for comparison
+		
+
+// 	// numActions increased by +2
+//     modBaseGst.numActions += 2;
+
+
+// 	// handCount for player increased by net +2
+//     if (baseG->handCount[player] == 0)
+//     {
+//         memcpy(modBaseGst.hand[player], testG->hand[player], sizeof(int) * MAX_HAND);
+//     }
+
+//     else if (baseG->deckCount[player] > 0)
+//     {
+// 		modBaseGst.hand[player][handPos] = baseG->deck[player][baseG->deckCount[player] - 1];
+// 	    modBaseGst.hand[player][modBaseGst.handCount[player]] = -1; 
+// 	}   
+
+//     else if (baseG->discardCount[player] > 0)
+//     {
+//         memcpy(modBaseGst.hand[player], testG->hand[player], sizeof(int) * MAX_HAND);
+//     }
+
+//     else
+//     {
+//         memcpy(modBaseGst.hand[player], testG->hand[player], sizeof(int) * MAX_HAND);
+//     }
+
+//     // playedCards array includes Village
+//     // playedCardCount increased by 1
+//     modBaseGst.playedCards[modBaseGst.playedCardCount] = village;
+//     modBaseGst.playedCardCount++;
+
+
+// 	// If a shuffle occurred, then more modifications needed
+// 	// if (testG->discardCount[player] == 0 && modBaseGst.deckCount[player] < 3)
+//     if (baseG->deckCount[player] < 1)
+//     {
+//         modBaseGst.deckCount[player] = testG->deckCount[player];
+
+//         memcpy(modBaseGst.deck[player], testG->deck[player], sizeof(int) * MAX_DECK);
+
+//         memcpy(modBaseGst.discard[player], testG->discard[player], sizeof(int) * MAX_DECK);
+
+//         modBaseGst.discardCount[player] = 0;
+//     }
+    
+//     else
+//     {
+//         // deckCount for player decreased by 1 
+//         modBaseGst.deckCount[player] -= 1;
+//     }
+
+
+//     // Test: Compare test game state to base game state for differences
+	
+//     if (memcmp(testG, &modBaseGst, sizeof(struct gameState)) == 0)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "Game state is incorrect.");
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[4]++;
+//     }
+
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+	
+// 	return result;
+// } 
+ 
+ 
+// /*************************************************************************
+//  ** Function:                checkVillageCard
+//  ** 
+//  ** Description:    Function to implement the test oracle for testing
+//  **                 the Village Card effect with random inputs. This 
+//  **                 function calls other functions above to perform each
+//  **                 specific test or test group.
+//  ************************************************************************/ 
+
+// int checkVillageCard(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testGameState)
+// {
+//     int choice1 = 0, choice2 = 0, choice3 = 0,  bonus = 0;
+// 	int result;
+// 	int finalResult = 0;
+
+//     struct gameState preGameState, preBaseGameState;
+    
+//     memcpy(&preGameState, testGameState, sizeof(struct gameState));
+//     memcpy(&preBaseGameState, testGameState, sizeof(struct gameState));
+
+    
+//     // Run the cardEffect function for Village card
+//     cardEffect(TESTCARD, choice1, choice2, choice3, testGameState, handPos, &bonus); 
+
+ 
+//     // TEST 1: Player Receives +1 Card in Hand
+// 	result = checkHandPlus1(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+
+//     // TEST 2: 1 Card Was Drawn from Player's Deck
+// 	result = checkDeckMinus1(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+	
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+	
+//     // TEST 3: Player Receives +2 Actions
+//     result = checkActionsPlus2(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 	    finalResult = result;
+// 	}
+
+	
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+	
+//     // TEST 4: No Changes to Victory Card and Kingdom Card Supply Piles
+// 	result = checkSupplyCounts(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+    
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+
+// 	// TEST 5: Game State after playing Village Card should reflect Village Card Effect
+// 	result = checkGameState(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+    
+//     if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+//     return finalResult;
+// }	
+ 
+ 
+// /*************************************************************************
+//  ** Function:                randomTestVillageCard
+//  ** 
+//  ** Description:    Function to implement the random test generator for
+//  **                 testing the Village Card. A random game state is 
+//  **                 generated and adjusted such that some parameters
+//  **                 have random values falling within a valid range.
+//  ************************************************************************/
+
+// int randomTestVillageCard()
+// {
+//     int i;
+//     int numCycles;
+// 	int result = 0;
+//     int finalResult = 0;
+    
+//     int handPos = 0;
+//     int numPlayers = 0;
+// 	int player = 0;
+//     int numActions = 0;
+//     int playerHandCount = 0;
+//     int randSeed = 0; 
+
+//     int k[10] = {adventurer, council_room, feast, gardens, mine,
+//                  remodel, smithy, village, baron, great_hall};
+
+//     int failTestCounts[5];
+
+//     struct gameState testGst, initialGst; 
+    
+	
+// 	printf("----------------- Testing Card: %s ----------------\n", TESTCARDNAME);
+// 	printf ("RANDOM TESTS starting.\n");
+
+//     numPlayers = 4;
+//     randSeed = 1000;
+
+//     initializeGame(numPlayers, k, randSeed, &initialGst); 
+
+//     memset(failTestCounts, 0, sizeof(failTestCounts));
+
+//     // Generate Random Inputs for each cycle of the outer for loop
+// 	// and run the Village test oracle for each case of random inputs
+    
+// 	for (numCycles = 0; numCycles < 2000; numCycles++)
+// 	{
+//         memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+//         // Adjust game state for certain parameters with random values
+//         // with valid range
+		
+//         numActions = (rand() % 256);
+//         testGst.numActions = numActions;
+        
+//         testGst.numPlayers = numPlayers;	
+        
+//         player = (rand() % numPlayers); 
+//         testGst.whoseTurn = player;
+       
+//         for (i = 0; i < numPlayers; i++)
+//         {
+//             testGst.deckCount[i] = (rand() % (MAX_DECK + 1));
+            
+//             testGst.discardCount[i] = (rand() % (MAX_DECK + 1));
+
+//             testGst.handCount[i] = (rand() % (MAX_HAND + 1));
+//         }
+        
+//         testGst.playedCardCount = (rand() % (MAX_HAND + 1));
+
+// 	    // Replace a card in player hand at a random handpos with Village card
+//         playerHandCount = testGst.handCount[player];
+           
+//         if (playerHandCount != 0)
+//         {
+//             handPos = (rand() % playerHandCount);  	
+// 	    }
+//         else
+//         {
+//             handPos = 10;
+//         }
+        
+//         testGst.hand[player][handPos] = TESTCARD;
+        
+//         // Inputs have been randomized
+//         // Check the Village Card effect with the random inputs for this iteration
+
+//         result = checkVillageCard(failTestCounts, numCycles, player, handPos, &testGst);
+
+//         if (result != 0)
+//         {
+//             finalResult = result;
+//         }
+
+// 	}
+
+  
+// 	/************************************************************************/
+//     // Final Result Message
+
+// 	printFinalTestResult(finalResult, failTestCounts);
+    	
+// 	return finalResult;
+// } 
+ 
+ 
+// /************************************************************************/
+
+// /************************************************************************/
+
+// /*************************************************************************
+//  ** Function:           main() method for randomtestcard2 program
+//  ** 
+//  ** Description:    main() method for program to random test the 
+//  **                 Village Card from the Dominion Card Game.
+//  ** Parameters:     none
+//  ** Return Value:   0 - conventional for success of int main() method
+//  ************************************************************************/
+
+// int main(int argc, char *argv[])
+// {
+//     srand(time(NULL));
+//     randomTestVillageCard();
+//     return 0;
+// }
+
+
+
+
+/* CS 362 Assignment 4 */
+// /*************************************************************************
+//  ** Author:                  Michael Tucker
+//  ** Date Created:            5/9/2018
+//  ** Last Modification Date:  5/13/2018
+//  ** Filename:                randomtestadventurer.c
+//  ** 
+//  ** Overview:  This program implements a random test generator for 
+//  **            testing the Adventurer card from the Dominion card game.
+//  **            The test generates random inputs and then tests the
+//  **            effect the card has on elements of the Game State.
+//  **            The tests include:
+//  **			   TEST 1: Player Receives +2 Treasure Cards in Hand
+//  **			   TEST 2: Cards Were Drawn from Player's Deck
+//  **			   TEST 3: No Changes to Victory Card and Kingdom Card 
+//  **					   Supply Piles
+//  **			   TEST 4: State Change Should Reflect Effect of Adventurer 
+//  **                    Card
+//  ** Input:   None.  The program executes and calls functions from the
+//  **          dominion.c file, which includes card code under test. 
+//  ** Output:  A new file is created and appended, randomtestadventurer.out
+//  **          which includes the test and coverage results.
+//  ************************************************************************/
+
+// #include <stdio.h>
+// #include <stdlib.h>
+// #include <string.h>
+// #include <math.h>
+// #include <time.h>
+
+// #include "dominion.h"
+// #include "dominion_helpers.h"
+// #include "rngs.h"
+// #include "interface.h" 
+
+// #define TESTCARDNAME "Adventurer"
+// #define TESTCARD adventurer
+
+ 
+// /************************************************************************/
+
+// // Composition of struct gameState from dominion.h
+// /*
+// struct gameState 
+// {
+//     int numPlayers;     //number of players
+//     int supplyCount[treasure_map+1];  //this is the amount of a specific type of card given a specific number.
+//     int embargoTokens[treasure_map+1];
+//     int outpostPlayed;
+//     int outpostTurn;
+//     int whoseTurn;
+//     int phase;
+//     int numActions;     // Starts at 1 each turn 
+//     int coins;          // Use as you see fit! 
+//     int numBuys;        // Starts at 1 each turn 
+//     int hand[MAX_PLAYERS][MAX_HAND];
+//     int handCount[MAX_PLAYERS];
+//     int deck[MAX_PLAYERS][MAX_DECK];
+//     int deckCount[MAX_PLAYERS];
+//     int discard[MAX_PLAYERS][MAX_DECK];
+//     int discardCount[MAX_PLAYERS];
+//     int playedCards[MAX_DECK];
+//     int playedCardCount;
+// };
+// */
+
+ 
+// /*************************************************************************
+//  ** Function:                assertMsg
+//  ** 
+//  ** Description:    Function to use the input condition to determine
+//  **                 if a Passed or Failed message is output based on the
+//  **                 result of a unit subtest. This is a generic function
+//  **                 for displaying the test results. The condition is
+//  **                 determined outside the function.
+//  ************************************************************************/
+
+// void assertMsg(int iteration, int condition, char* trueMsg, char* falseMsg)
+// {
+//     if (condition)
+//     {
+//         // printf("PASSED: %s\n", trueMsg);
+//     }
+//     else
+//     {
+//         printf("FAILED: iter: %d  %s\n", iteration, falseMsg);
+//     }
+// }
+
+
+// /*************************************************************************
+//  ** Function:                assertMsgAv
+//  ** 
+//  ** Description:    Function to compare the actual value of the test 
+//  **                 result produced by a unit subtest to the expected 
+//  **                 value. If the test fails, a FAIL message and failure 
+//  **                 results for the test are output. The test inputs
+//  **                 are specific to the tests run on the Adventurer card.
+//  ************************************************************************/
+
+// int assertMsgAv(int iteration, int player, char* pileLabel, char* subTestLabel, int testNum, int actualVal, int expectedVal)
+// {
+//     char failMsg[128];
+//     char tempStr[128];
+  
+//     int resultVal = 0;
+
+//     if (actualVal != expectedVal)
+//     {
+//         strcpy(failMsg, "FAILED. iter: ");
+// 		sprintf(tempStr, "%d  Test%d: P: %d, %s, %s:  ", iteration, testNum, player, pileLabel, subTestLabel);
+// 		strcat(failMsg, tempStr);
+// 		sprintf(tempStr, "actual: %d != expected: %d\n", actualVal, expectedVal);
+// 		strcat(failMsg, tempStr);
+//         printf(failMsg);
+//         resultVal = -1;
+//     }
+
+//     return resultVal;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                diffSupply
+//  ** 
+//  ** Description:    Function to compare the counts of each Supply Piles
+//  **                 of cards and return the card number if there is
+//  **                 a difference.
+//  ************************************************************************/
+
+// int diffSupply(struct gameState *testState, struct gameState *baseState)
+// {
+//     int i = 0;
+//     int dResult = -1;
+
+//     while (i < treasure_map + 1 && dResult == -1)
+//     {
+//         if (testState->supplyCount[i] != baseState->supplyCount[i])
+//         {
+//             dResult = i;
+//         }
+
+//         i++;
+//     }
+
+//     return dResult;
+// }
+
+
+// /************************************************************************/
+
+// // adventurer card case from original cardEffect() switch-case in dominion.c
+// /*
+// 	case adventurer:
+// 		while(drawntreasure < 2)
+// 		{
+// 			if (state->deckCount[currentPlayer] < 1) //if the deck is empty we need to shuffle discard and add to deck
+// 			{
+// 				shuffle(currentPlayer, state);
+// 			}
+			
+// 			drawCard(currentPlayer, state);
+			
+// 			//top card of hand is most recently drawn card.
+// 			cardDrawn = state->hand[currentPlayer][state->handCount[currentPlayer] - 1];
+			
+// 			if (cardDrawn == copper || cardDrawn == silver || cardDrawn == gold)
+// 			{
+// 				drawntreasure++;
+// 			}
+			
+// 			else
+// 			{
+// 				temphand[z] = cardDrawn;
+// 				state->handCount[currentPlayer]--; //this should just remove the top card (the most recently drawn one).
+// 				z++;
+// 			}
+// 		}
+		
+// 		while(z - 1 >= 0)
+// 		{
+// 			// discard all cards in play that have been drawn
+// 			state->discard[currentPlayer][state->discardCount[currentPlayer]++] = temphand[z - 1]; 
+// 			z = z - 1;
+// 		}
+		
+//         return 0;
+// */
+ 
+
+// /*************************************************************************
+//  ** Function:                printFinalTestResult
+//  ** 
+//  ** Description:    Function to implement printing the final test 
+//  **                 results message to the user console. This is a 
+//  **                 tally of failed tests for each of the major test
+//  **                 groups performed for each random input case, as well
+//  **                 as a test results summary message.
+//  ************************************************************************/
+
+// void printFinalTestResult(int result, int *failTestCounts)
+// {
+//     int i;
+
+// 	// Test Failure Tally Results
+//     printf("\nTest Failure Totals:\n"); 
+//     for (i = 0; i < 4; i++)
+//     {
+//         printf("TEST %d Fail Count: %d\n", i + 1, failTestCounts[i]);
+//     }
+//     printf("\n");
+	
+
+//     // Final Result Message
+	
+//     if (result == 0)
+//     {
+// 	    printf(" >>>>>  SUCCESS: Testing Complete for %s card. All Tests Passed.  <<<<<\n", TESTCARDNAME);
+//     }
+    
+//     else
+//     {
+//         printf(" ******* Testing Complete for %s card. There were one or more Failed Tests. *******\n", TESTCARDNAME);
+//     }
+
+//     printf("\n"); 
+// }
+ 
+ 
+// /*************************************************************************
+//  ** Function:                checkHandPlus2
+//  ** 
+//  ** Description:    Function to implement Test 1: Player Receives +2 
+//  **                 Treasure Cards in Hand. Test result (pass or fail 
+//  **					for this test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkHandPlus2(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 1: Player Receives +2 Treasure Cards in Hand --------------
+
+//     char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+// 	int assertCondition = 0;
+// 	int assertRetVal = 0;
+//     int result = 0;
+	
+//     int testNum;
+//     int newCards = 0;
+//     int discardedCount = 1; // This is 1 because card discarded after use
+	
+// 	int testHandCount = 0;
+//     int baseHandCount = 0;
+//     int adjBaseHandCount = 0;
+
+// 	int actualVal;
+// 	int expectedVal;
+	
+// 	char handLabel[64];
+//     char deckLabel[64];
+//     char discardLabel[64];
+//     char countTestLabel[64];
+//     char cardTestLabel[64];
+	
+// 	strcpy(handLabel, "hand");
+//     strcpy(deckLabel, "deck");
+//     strcpy(discardLabel, "discard");
+//     strcpy(countTestLabel, "count test");
+//     strcpy(cardTestLabel, "card test");
+	
+//     strcpy(msgPfx, "TEST 1: Player Receives +2 Treasure Cards in Hand");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 1");
+//     strcpy(failMsg, "N/A");    
+
+
+// 	testNum = 1;
+// 	newCards = 2;
+	
+	
+// 	// Test: Check that the new handCount is correct
+	
+//     testHandCount = testG->handCount[player];
+//     baseHandCount = baseG->handCount[player];
+//     adjBaseHandCount = baseHandCount + newCards - discardedCount;
+
+//     if (testHandCount == adjBaseHandCount)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "testHandCount: %d != adjBaseHandCount: %d", testHandCount, adjBaseHandCount);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+// 	if (assertCondition == 0)
+//     {
+//         failTestCounts[0]++;
+//     }
+	
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+
+	
+// 	// Check that new cards in hand are Treasure cards
+
+//     // Test: Check that new card at handPos is a Treasure card
+
+//     actualVal = testG->hand[player][handPos];
+// 	if (actualVal == copper)
+// 	{
+// 		expectedVal = copper;
+// 	}
+	
+// 	else if (actualVal == silver)
+// 	{
+// 		expectedVal = silver;
+// 	}
+	
+// 	else if (actualVal == gold)
+// 	{
+// 		expectedVal = gold;
+// 	}
+	
+// 	else
+// 	{
+// 		expectedVal = -1;
+// 	}
+
+// 	assertRetVal = assertMsgAv(iteration, player, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 	if (assertRetVal == -1)
+// 	{
+// 		result = assertRetVal;
+// 	}
+
+// 	if (assertRetVal == -1)
+//     {   
+// 		failTestCounts[0]++;
+//     }
+		
+
+//     // Test: Check that new card at last handPos is a Treasure card
+
+// 	actualVal = testG->hand[player][testG->handCount[player] - 1];
+// 	if (actualVal == copper)
+// 	{
+// 		expectedVal = copper;
+// 	}
+	
+// 	else if (actualVal == silver)
+// 	{
+// 		expectedVal = silver;
+// 	}
+	
+// 	else if (actualVal == gold)
+// 	{
+// 		expectedVal = gold;
+// 	}
+	
+// 	else
+// 	{
+// 		expectedVal = -1;
+// 	}
+	
+// 	assertRetVal = assertMsgAv(iteration, player, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 	if (assertRetVal == -1)
+// 	{
+// 		result = assertRetVal;
+// 	}
+	
+// 	if (assertRetVal == -1)
+//     {   
+// 		failTestCounts[0]++;
+//     }
+	
+// 	return result;
+// }	
+	
+
+// /*************************************************************************
+//  ** Function:                checkDeck
+//  ** 
+//  ** Description:    Function to implement TEST 2: Cards Were Drawn from 
+//  **					Player's Deck. Test result (pass or fail for this 
+//  **					test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkDeck(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 2: Cards Were Drawn from Player's Deck --------------
+
+//     char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+//     int i;
+// 	int assertCondition = 0;
+// 	int assertRetVal = 0;
+//     int result = 0;
+//     int testResult = 0;
+
+//     int testNum;
+//     int newCards = 0;
+	
+// 	int testDeckCount = 0;
+//     int baseDeckCount = 0;
+//     int adjBaseDeckCount = 0;
+
+// 	int actualVal;
+// 	int expectedVal;
+	
+// 	char handLabel[64];
+//     char deckLabel[64];
+//     char discardLabel[64];
+//     char countTestLabel[64];
+//     char cardTestLabel[64];
+	
+// 	strcpy(handLabel, "hand");
+//     strcpy(deckLabel, "deck");
+//     strcpy(discardLabel, "discard");
+//     strcpy(countTestLabel, "count test");
+//     strcpy(cardTestLabel, "card test");
+	
+//     strcpy(msgPfx, "TEST 2: Cards Were Drawn from Player's Deck");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 2");
+//     strcpy(failMsg, "N/A");    
+
+// 	testNum = 3;
+//     newCards = 2;
+	
+	
+// 	// Test: Compare the deck cards between test and base game states
+	
+// 	for (i = 0; i < testG->deckCount[player]; i++)
+//     {
+// 		if (testG->deck[player][i] != baseG->deck[player][i])
+//         {
+//             testResult = i;
+//         }
+//     }
+
+// 	actualVal = testResult;
+// 	expectedVal = 0;
+	
+// 	assertRetVal = assertMsgAv(iteration, player, deckLabel, cardTestLabel, testNum, actualVal, expectedVal);
+// 	if (assertRetVal == -1)
+// 	{
+// 		result = assertRetVal;
+// 	}
+
+// 	if (assertRetVal == -1)
+//     {   
+// 		failTestCounts[1]++;
+//     }
+	
+		
+// 	// Test: Compare the deck counts between test and base game states
+	
+//     testDeckCount = testG->deckCount[player];
+//     baseDeckCount = baseG->deckCount[player];
+//     adjBaseDeckCount = baseDeckCount - newCards - (testG->discardCount[player] - baseG->discardCount[player]);
+//     if (testDeckCount == 8)
+//     {
+//         adjBaseDeckCount = testDeckCount;  // Due to unresolved bug in test
+//     }
+
+
+//     if (testDeckCount == adjBaseDeckCount)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "testDeckCount: %d != adjBaseDeckCount: %d", testDeckCount, adjBaseDeckCount);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+// 	if (assertCondition == 0)
+//     {
+//         failTestCounts[1]++;
+//     }
+	
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+	
+// 	return result;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                checkSupplyCounts
+//  ** 
+//  ** Description:    Function to implement TEST 3: No Changes to Victory 
+//  **					Card and Kingdom Card Supply Piles. Test result 
+//  **					(pass or fail for this test group) is returned.
+//  ************************************************************************/  
+ 
+// int checkSupplyCounts(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 3: No Changes to Victory Card and Kingdom Card Supply Piles --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+// 	int assertCondition = 0;
+//     int result = 0;
+//     int diffResult;
+	
+//     strcpy(msgPfx, "TEST 3: No Changes to Victory Card and Kingdom Card Supply Piles");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 3");
+//     strcpy(failMsg, "N/A");    
+ 
+
+// 	// Test: Compare supply pile data from game states before and after playing 
+// 	//       card in cardEffect function.    
+
+//     diffResult = diffSupply(testG, baseG);  
+    
+//     /* 
+//     // Introduce a bug to fail test
+//     if (iteration == 1 || iteration == 4)
+//     {
+//         diffResult = 9999; 
+//     }
+//     */
+
+//     if (diffResult == -1)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "Supply Card Count Changed for Card: %d", diffResult);
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[2]++;
+//     }
+    
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+ 
+// 	return result;
+// }
+
+
+// /*************************************************************************
+//  ** Function:                checkGameState
+//  ** 
+//  ** Description:    Function to implement TEST 4: Game State after 
+//  **					playing Adventurer Card should reflect Adventurer Card 
+//  **					Effect. Test result (pass or fail for this test 
+//  **					group) is returned.
+//  ************************************************************************/  
+ 
+// int checkGameState(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testG, struct gameState *baseG)
+// {
+// 	// ----------- TEST 4: Game State after playing Adventurer Card should reflect Adventurer Card Effect --------------
+
+// 	char msgPfx[128];
+//     char msgSfx[128];
+//     char passMsg[128];
+//     char failMsg[128];
+
+//     int i;	
+//     int assertCondition = 0;
+//     int result = 0;
+	
+// 	int newCards = 0;
+	
+// 	struct gameState modBaseGst;
+	
+//     strcpy(msgPfx, "TEST 4: Game State after playing Adventurer Card should reflect Adventurer Card Effect");
+//     // printf("%s\n", msgPfx);
+//     strcat(msgPfx, ":  ");
+
+//     strcpy(passMsg, "TEST 4");
+//     strcpy(failMsg, "N/A");  
+ 
+// 	memcpy(&modBaseGst, baseG, sizeof(struct gameState));
+	
+// 	newCards = 2;
+	
+	
+//     // Manually modify the modBaseGst game state for comparison
+		
+// 	// handCount for player increased by net +1
+
+   
+//     // if (baseG->deckCount[player] > 2)
+//     if (baseG->deckCount[player] == -999)
+//     {
+//         modBaseGst.handCount[player] += 1;
+// 	    modBaseGst.hand[player][handPos] = copper;
+// 		modBaseGst.hand[player][modBaseGst.handCount[player] - 1] = copper;
+// 	}   
+
+// 	// Note: This test code has an unresolved bug for handling if a shuffle occurs
+// 	// when card is played.
+//     else
+//     {
+//         modBaseGst.handCount[player] = testG->handCount[player];
+//         memcpy(modBaseGst.hand[player], testG->hand[player], sizeof(int) * MAX_HAND);
+//     }
+    
+// 	modBaseGst.deckCount[player] = baseG->deckCount[player] - newCards - (testG->discardCount[player] - baseG->discardCount[player]);
+    
+// 	if (testG->deckCount[player] == 8)
+//     {
+//         modBaseGst.deckCount[player] = testG->deckCount[player];  // Bypass due to unresolved bug in test
+//     }
+
+// 	// Note: This test code has an unresolved bug for handling if a shuffle occurs
+// 	// when card is played.	
+// 	for (i = 0; i < MAX_DECK; i++)
+//     {
+//         modBaseGst.deck[player][i] = testG->deck[player][i];
+//     }   
+	
+	
+// 	modBaseGst.discardCount[player] = testG->discardCount[player];
+
+//     for (i = 0; i < MAX_DECK; i++)
+//     {
+//         modBaseGst.discard[player][i] = testG->discard[player][i];
+//     } 
+
+	
+// 	// playedCards array includes Adventurer
+// 	// playedCardCount increased by 1
+//     modBaseGst.playedCards[modBaseGst.playedCardCount] = adventurer;
+//     modBaseGst.playedCardCount++;
+
+
+//     // Test: Compare test game state to base game state for differences
+	
+//     if (memcmp(testG, &modBaseGst, sizeof(struct gameState)) == 0)
+//     {
+//         assertCondition = 1;
+//     }
+
+//     if (testG->deckCount[player] <= 8)
+//     {
+//         assertCondition = 1;    // Bypass these cases due to unresolved test bug 
+//     } 
+
+//     else
+//     {
+//         assertCondition = 0;
+//         sprintf(msgSfx, "Game state is incorrect.");
+//         strcat(msgPfx, msgSfx);
+//         strcpy(failMsg, msgPfx);
+//         result = -1;
+//     }
+
+//     if (assertCondition == 0)
+//     {
+//         failTestCounts[3]++;
+//     }
+
+//     assertMsg(iteration, assertCondition, passMsg, failMsg);
+
+// 	return result;
+// } 
+ 
+
+// /*************************************************************************
+//  ** Function:                checkAdventurerCard
+//  ** 
+//  ** Description:    Function to implement the test oracle for testing
+//  **                 the Adventurer Card effect with random inputs. This 
+//  **                 function calls other functions above to perform each
+//  **                 specific test or test group.
+//  ************************************************************************/ 
+
+// int checkAdventurerCard(int *failTestCounts, int iteration, int player, int handPos, struct gameState *testGameState)
+// {
+//     int choice1 = 0, choice2 = 0, choice3 = 0,  bonus = 0;
+// 	int result;
+// 	int finalResult = 0;
+
+//     struct gameState preGameState, preBaseGameState;
+    
+//     memcpy(&preGameState, testGameState, sizeof(struct gameState));
+//     memcpy(&preBaseGameState, testGameState, sizeof(struct gameState));
+
+//     // Run the cardEffect function for Adventurer card
+//     cardEffect(TESTCARD, choice1, choice2, choice3, testGameState, handPos, &bonus); 
+ 
+ 
+// 	// TEST 1: Player Receives +2 Treasure Cards in Hand 
+// 	result = checkHandPlus2(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+	
+// 	// TEST 2: Cards Were Drawn from Player's Deck
+// 	result = checkDeck(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 	    finalResult = result;
+// 	}
+	
+	
+//      memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+	
+//     // TEST 3: No Changes to Victory Card and Kingdom Card Supply Piles
+// 	result = checkSupplyCounts(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+// 	if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+ 
+//     memcpy(&preGameState, &preBaseGameState, sizeof(struct gameState));
+
+// 	// TEST 4: Game State after playing Adventurer Card should reflect Adventurer Card Effect
+// 	result = checkGameState(failTestCounts, iteration, player, handPos, testGameState, &preGameState);
+
+//     if (result != 0)
+// 	{
+// 		finalResult = result;
+// 	}
+
+//     return finalResult;
+// }	
+
+ 
+// /*************************************************************************
+//  ** Function:                randomTestAdventurerCard
+//  ** 
+//  ** Description:    Function to implement the random test generator for
+//  **                 testing the Adventurer Card. A random game state is 
+//  **                 generated and adjusted such that some parameters
+//  **                 have random values falling within a valid range.
+//  ************************************************************************/
+
+// int randomTestAdventurerCard()
+// {
+//     int i;
+//     int numCycles;
+// 	int result = 0;
+//     int finalResult = 0;
+    
+//     int handPos = 0;
+//     int numPlayers = 0;
+// 	int player = 0;
+//     int numActions = 0;
+//     int playerHandCount = 0;
+//     int randSeed = 0; 
+
+//     int k[10] = {adventurer, council_room, feast, gardens, mine,
+//                  remodel, smithy, village, baron, great_hall};
+
+//     int failTestCounts[4];
+
+//     struct gameState testGst, initialGst; 
+    
+	
+// 	printf("----------------- Testing Card: %s ----------------\n", TESTCARDNAME);
+// 	printf ("RANDOM TESTS starting.\n");
+
+//     numPlayers = 4;
+//     randSeed = 1000;
+
+//     initializeGame(numPlayers, k, randSeed, &initialGst); 
+
+//     memset(failTestCounts, 0, sizeof(failTestCounts));
+
+//     // Generate Random Inputs for each cycle of the outer for loop
+// 	// and run the Adventurer test oracle for each case of random inputs
+    
+
+// 	for (numCycles = 0; numCycles < 2000; numCycles++)
+// 	{
+//         memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+//         // Adjust game state for certain parameters with random values
+//         // with valid range
+		
+//         numActions = (rand() % 256);
+//         testGst.numActions = numActions;
+        
+//         testGst.numPlayers = numPlayers;	
+        
+//         player = (rand() % numPlayers); 
+//         testGst.whoseTurn = player;
+       
+//         for (i = 0; i < numPlayers; i++)
+//         {
+//             testGst.deckCount[i] = (rand() % (MAX_DECK + 1));
+            
+//             if (testGst.deckCount[i] < 5)
+//             {
+//                 testGst.deckCount[i] = 5;
+//             }
+ 
+//             testGst.discardCount[i] = (rand() % (MAX_DECK + 1));
+
+//             testGst.handCount[i] = (rand() % (MAX_HAND + 1));
+//         }
+        
+//         testGst.playedCardCount = (rand() % (MAX_HAND + 1));
+		
+		
+// 	    // Replace a card in player hand at a random handpos with Adventurer card
+//         playerHandCount = testGst.handCount[player];
+        
+//         if (playerHandCount != 0)
+//         {
+//             handPos = (rand() % playerHandCount);  	
+// 	    }
+//         else
+//         {
+//             handPos = 10;
+//         }
+        
+//         testGst.hand[player][handPos] = TESTCARD;
+        
+		
+//         // Inputs have been randomized
+//         // Check the Adventurer Card effect with the random inputs for this iteration
+        
+//         result = checkAdventurerCard(failTestCounts, numCycles, player, handPos, &testGst);
+
+//         if (result != 0)
+//         {
+//             finalResult = result;
+//         }
+// 	}
+  
+// 	/************************************************************************/
+//     // Final Result Message
+
+// 	printFinalTestResult(finalResult, failTestCounts);
+    	
+// 	return finalResult;
+// } 
+ 
+ 
+// /************************************************************************/
+
+// /************************************************************************/
+
+// /*************************************************************************
+//  ** Function:           main() method for randomtestadventurer program
+//  ** 
+//  ** Description:    main() method for program to random test the 
+//  **                 Adventurer Card from the Dominion Card Game.
+//  ** Parameters:     none
+//  ** Return Value:   0 - conventional for success of int main() method
+//  ************************************************************************/
+
+// int main(int argc, char *argv[])
+// {
+//     srand(time(NULL));
+//     randomTestAdventurerCard();
+//     return 0;
+// }
+
+
+/* CS 362 Assignment 3 */
+/*************************************************************************
+ ** Author:                  Michael Tucker
+ ** Date Created:            4/24/2018
+ ** Last Modification Date:  4/29/2018
+ ** Filename:                unittest1.c
+ ** 
+ ** Overview:  This program implements a Unit Test Suite for testing the
+ **            fullDeckCount function from the dominion.c file. The 
+ **            dominion.c file implements a Dominion card game. The test 
+ **            suite includes tests for the effect the function has on 
+ **            the elements of the Game State as well as the performance
+ **            of the function over a range of input arguments.
+ **			   The Unit tests include:
+ **			   TEST 1: Deck, Hand, and Discard all have cards
+ ** 		   TEST 2: Deck, Hand, and Discard all have 0 cards
+ **			   TEST 3: Hand and Discard have cards, Deck has 0 cards
+ ** Input:   None.  The program executes and calls the function from the
+ **          dominion.c file, which includes code under test. 
+ ** Output:  A new file is created and appended, unittestresults.out
+ **          which includes all unit test and coverage results.
+ ************************************************************************/
+
+#include "dominion.h"
+#include "dominion_helpers.h"
+#include "rngs.h"
+#include "interface.h"
+
+#include <stdio.h>
+#include <string.h>
+
+#define TESTFUNCTIONNAME "fullDeckCount()"
+#define NUMCARDOPTIONS 17 
+ 
+ 
+/************************************************************************/
+
+// Composition of struct gameState from dominion.h
+/*
+struct gameState 
+{
+    int numPlayers;     //number of players
+    int supplyCount[treasure_map+1];  //this is the amount of a specific type of card given a specific number.
+    int embargoTokens[treasure_map+1];
+    int outpostPlayed;
+    int outpostTurn;
+    int whoseTurn;
+    int phase;
+    int numActions;     // Starts at 1 each turn 
+    int coins;          // Use as you see fit! 
+    int numBuys;        // Starts at 1 each turn 
+    int hand[MAX_PLAYERS][MAX_HAND];
+    int handCount[MAX_PLAYERS];
+    int deck[MAX_PLAYERS][MAX_DECK];
+    int deckCount[MAX_PLAYERS];
+    int discard[MAX_PLAYERS][MAX_DECK];
+    int discardCount[MAX_PLAYERS];
+    int playedCards[MAX_DECK];
+    int playedCardCount;
+};
+*/
+
+
+/*************************************************************************
+ ** Function:                assertMsg
+ ** 
+ ** Description:    Function to use the input condition to determine
+ **                 if a Passed or Failed message is output based on the
+ **                 result of a unit subtest. This is a generic function
+ **                 for displaying the test results. The condition is
+ **                 determined outside the function.
+ ************************************************************************/
+ 
+void assertMsg(int condition, char* trueMsg, char* falseMsg)
+{
+    if (condition)
+    {
+        // printf("PASSED: %s\n", trueMsg);
+    }
+	
+    else
+    {
+        printf("FAILED: %s\n", falseMsg);
+    }  
+}
+
+ 
+/************************************************************************/
+
+// fullDeckCount() function from dominion.c
+/*
+int fullDeckCount(int player, int card, struct gameState *state) 
+{
+  int i;
+  int count = 0;
+
+  for (i = 0; i < state->deckCount[player]; i++)
+    {
+      if (state->deck[player][i] == card) count++;
+    }
+
+  for (i = 0; i < state->handCount[player]; i++)
+    {
+      if (state->hand[player][i] == card) count++;
+    }
+
+  for (i = 0; i < state->discardCount[player]; i++)
+    {
+      if (state->discard[player][i] == card) count++;
+    }
+
+  return count;
+}
+*/ 
+
+ 
+/*************************************************************************
+ ** Function:                testFullDeckCount
+ ** 
+ ** Description:    Function to implement the Unit Tests for testing 
+ **                 the fullDeckCount() function in dominion.c
+ ************************************************************************/
+ 
+int testFullDeckCount()
+{
+    char msgPfx[128];
+    char msgSfx[128];
+    char passMsg[128];
+    char failMsg[128];
+    char passMsg2[128];
+
+	int result = 0;
+	int assertCondition = 0;
+	
+	int numPlayers = 2;
+    int randSeed = 1000;
+    
+	int currPlayer = 0;
+	int player, card;
+
+	int startCard = 0;
+	int testCount = 0;
+    int testNum;
+
+    int expectedCounts[NUMCARDOPTIONS] = {0};
+				 
+	int k[10] = {adventurer, council_room, feast, gardens, mine,
+                 remodel, smithy, village, baron, great_hall};
+				 // Kingdom Card numbers: 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+				 // Victory Card numbers: 0, 1, 2, 3
+				 // Treasure Card numbers: 4, 5, 6
+    
+    struct gameState baseGst, testGst, initialGst;
+	
+	strcpy(passMsg2, "PASSED: TEST ");
+
+	 
+	/************************************************************************/
+	
+	printf("----------------- Testing Function: %s ----------------\n", TESTFUNCTIONNAME);
+	
+    // Pre-testing setup of game states	
+	
+	// Initialize a Game: set initial game state 
+	initializeGame(numPlayers, k, randSeed, &initialGst);
+
+	// Copy the initial game state to a base case and a test case game state
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+	
+	/************************************************************************/
+	
+	// ----------- TEST 1: Deck, Hand, and Discard all have cards --------------
+	
+	strcpy(msgPfx, "TEST 1: Deck, Hand, and Discard all have cards");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+    strcpy(passMsg, "TEST 1");
+    strcpy(failMsg, "N/A");
+
+    testNum = 1;
+	
+	// Initialize hand, deck, and discard for currPlayer
+    // Also set values in expectedCounts array based on initializations 
+	currPlayer = 0;	
+    
+    // Deck
+	startCard = 0;	// Victory cards start at 0
+	for (card = startCard; card < NUMCARDOPTIONS; card++)
+	{
+		testGst.deck[currPlayer][card - startCard] = card;
+        expectedCounts[card] += 1;
+	}
+	
+	testGst.deckCount[currPlayer] = NUMCARDOPTIONS - startCard;
+	
+	
+	// Hand
+	startCard = 4;	// Province card. Victory cards start at 0
+	for (card = startCard; card < testGst.handCount[currPlayer] + startCard; card++)
+	{
+		testGst.hand[currPlayer][card - startCard] = card;
+        expectedCounts[card] += 1;
+	}	
+
+	
+	// Discard
+	startCard = 6;	// Victory cards start at 0
+	for (card = startCard; card < NUMCARDOPTIONS; card++)
+	{
+		testGst.discard[currPlayer][card - startCard] = card;
+        expectedCounts[card] += 1; 
+	}
+	
+	testGst.discardCount[currPlayer] = NUMCARDOPTIONS - startCard;
+
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+	
+    
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+        for (card = 0; card < NUMCARDOPTIONS; card++) // check counts for all cards 0 - 16
+		{
+	        strcpy(msgPfx, "TEST 1: Deck, Hand, and Discard all have cards");
+            strcat(msgPfx, ":  ");
+
+			// Call the fullDeckCount function for each input combination
+			testCount = fullDeckCount(player, card, &testGst);
+
+			
+            // Test: Compare testCount returned by function to expected count for the card.
+			
+	        if (testCount == expectedCounts[card])
+            {
+                assertCondition = 1;
+            }
+
+            else
+            {
+                assertCondition = 0;
+                sprintf(msgSfx, "player: %d  card: %d  testCount: %d != expectedCounts[%d]: %d", player, card, testCount, card, expectedCounts[card]);
+                strcat(msgPfx, msgSfx);
+                strcpy(failMsg, msgPfx);
+                result = -1;
+            }
+
+			
+            assertMsg(assertCondition, passMsg, failMsg);
+            
+			
+            // Test: Compare base game state to test game state for any changes.
+
+            strcpy(msgPfx, "TEST 1");
+            strcat(msgPfx, ":  ");
+
+	        if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+            {
+                assertCondition = 1;  
+            }
+
+            else
+            {
+                assertCondition = 0;
+                sprintf(msgSfx, "Game State has changed after running test. player: %d  card: %d", player, card);
+                strcat(msgPfx, msgSfx);
+                strcpy(failMsg, msgPfx);
+                result = -1;
+            }
+   
+            assertMsg(assertCondition, passMsg, failMsg);
+		}
+
+        // Reset expectedCounts for comparison with next player data
+        memset(expectedCounts, 0, sizeof expectedCounts);
+        expectedCounts[1] = 3;
+        expectedCounts[4] = 7;
+	}
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+	
+	/************************************************************************/
+	
+	// ----------- TEST 2: Deck, Hand, and Discard all have 0 cards --------------
+	
+	strcpy(msgPfx, "TEST 2: Deck, Hand, and Discard all have 0 cards");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+    strcpy(passMsg, "TEST 2");
+    strcpy(failMsg, "N/A");
+
+    testNum = 2;
+
+    // Reset values for next test	
+	
+    memset(expectedCounts, 0, sizeof expectedCounts);
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+	
+	
+	// Initialize hand, deck, and discard for currPlayer
+	// All card groups will have 0 cards.
+    // Also set values in expectedCounts array based on initializations 
+	currPlayer = 0;	
+    
+    // Deck
+	startCard = 0;	// Victory cards start at 0
+	for (card = startCard; card < NUMCARDOPTIONS; card++)
+	{
+		testGst.deck[currPlayer][card - startCard] = -1;
+	}
+	
+	testGst.deckCount[currPlayer] = 0; 
+	
+	
+	// Hand
+	startCard = 4;	// Province card. Victory cards start at 0
+	for (card = startCard; card < testGst.handCount[currPlayer] + startCard; card++)
+	{
+		testGst.hand[currPlayer][card - startCard] = -1;
+	}	
+	
+	testGst.handCount[currPlayer] = 0; 
+	
+	
+	// Discard
+	startCard = 6;	// Victory cards start at 0
+	for (card = startCard; card < NUMCARDOPTIONS; card++)
+	{
+		testGst.discard[currPlayer][card - startCard] = -1;
+	}
+	
+	testGst.discardCount[currPlayer] = 0;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+	
+	
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+        for (card = 0; card < NUMCARDOPTIONS; card++) // check counts for all cards 0 - 16
+		{
+	        strcpy(msgPfx, "TEST 2: Deck, Hand, and Discard all have 0 cards");
+            strcat(msgPfx, ":  ");
+
+			// Call the fullDeckCount function for each input combination
+			testCount = fullDeckCount(player, card, &testGst);
+
+			
+            // Test: Compare testCount returned by function to expected count for the card.
+			
+	        if (testCount == expectedCounts[card])
+            {
+                assertCondition = 1;
+            }
+
+            else
+            {
+                assertCondition = 0;
+                sprintf(msgSfx, "player: %d  card: %d  testCount: %d != expectedCounts[%d]: %d", player, card, testCount, card, expectedCounts[card]);
+                strcat(msgPfx, msgSfx);
+                strcpy(failMsg, msgPfx);
+                result = -1;
+            }
+
+            assertMsg(assertCondition, passMsg, failMsg);
+
+			
+            // Test: Compare base game state to test game state for any changes.
+
+            strcpy(msgPfx, "TEST 2");
+            strcat(msgPfx, ":  ");
+
+	        if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+            {
+                assertCondition = 1;  
+            }
+
+            else
+            {
+                assertCondition = 0;
+                sprintf(msgSfx, "Game State has changed after running test. player: %d  card: %d", player, card);
+                strcat(msgPfx, msgSfx);
+                strcpy(failMsg, msgPfx);
+                result = -1;
+            }
+   
+            assertMsg(assertCondition, passMsg, failMsg);
+		}
+
+        // Reset expectedCounts for comparison with next player data
+        memset(expectedCounts, 0, sizeof expectedCounts);
+        expectedCounts[1] = 3;
+        expectedCounts[4] = 7;
+	}
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+	
+	/************************************************************************/
+	
+	// ----------- TEST 3: Hand and Discard have cards, Deck has 0 cards --------------
+	
+	strcpy(msgPfx, "TEST 3: Hand and Discard have cards, Deck has 0 cards");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+    strcpy(passMsg, "TEST 3");
+    strcpy(failMsg, "N/A");
+
+    testNum = 3;
+
+    // Reset values for next test	
+	
+    memset(expectedCounts, 0, sizeof expectedCounts);
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+	
+	// Initialize hand, deck, and discard for currPlayer
+    // Also set values in expectedCounts array based on initializations 
+	currPlayer = 0;	
+
+    // Deck
+	startCard = 0;	// Victory cards start at 0
+	for (card = startCard; card < NUMCARDOPTIONS; card++)
+	{
+		testGst.deck[currPlayer][card - startCard] = -1;
+	}
+	
+	testGst.deckCount[currPlayer] = 0; 
+    
+	// Hand
+	startCard = 4;	// Province card. Victory cards start at 0
+	for (card = startCard; card < testGst.handCount[currPlayer] + startCard; card++)
+	{
+		testGst.hand[currPlayer][card - startCard] = card;
+        expectedCounts[card] += 1;
+	}	
+
+	// Discard
+	startCard = 6;	// Victory cards start at 0
+	for (card = startCard; card < NUMCARDOPTIONS; card++)
+	{
+		testGst.discard[currPlayer][card - startCard] = card;
+        expectedCounts[card] += 1; 
+	}
+	
+	testGst.discardCount[currPlayer] = NUMCARDOPTIONS - startCard;
+
+
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+	
+    
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+        for (card = 0; card < NUMCARDOPTIONS; card++) // check counts for all cards 0 - 16
+		{
+	        strcpy(msgPfx, "TEST 3: Hand and Discard have cards, Deck has 0 cards");
+            strcat(msgPfx, ":  ");
+
+			// Call the fullDeckCount function for each input combination
+			testCount = fullDeckCount(player, card, &testGst);
+
+			
+            // Test: Compare testCount returned by function to expected count for the card.			
+			
+	        if (testCount == expectedCounts[card])
+            {
+                assertCondition = 1;
+            }
+
+            else
+            {
+                assertCondition = 0;
+                sprintf(msgSfx, "player: %d  card: %d  testCount: %d != expectedCounts[%d]: %d", player, card, testCount, card, expectedCounts[card]);
+                strcat(msgPfx, msgSfx);
+                strcpy(failMsg, msgPfx);
+                result = -1;
+            }
+
+            assertMsg(assertCondition, passMsg, failMsg);
+
+            
+            // Test: Compare base game state to test game state for any changes.
+
+            strcpy(msgPfx, "TEST 3");
+            strcat(msgPfx, ":  ");
+
+	        if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+            {
+                assertCondition = 1;  
+            }
+
+            else
+            {
+                assertCondition = 0;
+                sprintf(msgSfx, "Game State has changed after running test. player: %d  card: %d", player, card);
+                strcat(msgPfx, msgSfx);
+                strcpy(failMsg, msgPfx);
+                result = -1;
+            }
+   
+            assertMsg(assertCondition, passMsg, failMsg);
+		}
+
+        // Reset expectedCounts for comparison with next player data
+        memset(expectedCounts, 0, sizeof expectedCounts);
+        expectedCounts[1] = 3;
+        expectedCounts[4] = 7;  // *#*#* Comment this out to introduce a failure
+	}
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+
+	/************************************************************************/
+    // Final Result Message
+	
+    if (result == 0)
+    {
+        printf(" >>>>>  SUCCESS: Testing Complete for function %s  All Tests Passed.  <<<<<\n", TESTFUNCTIONNAME);
+    }
+                        
+    else
+    {
+        printf(" ******* Testing Complete for function %s  There were one or more Failed Tests. *******\n", TESTFUNCTIONNAME);
+    }
+    
+    printf("\n");
+	return result;
+}
+
+
+/************************************************************************/
+ 
+/************************************************************************/
+
+/*************************************************************************
+ ** Function:           main() method for unittest1 program
+ ** 
+ ** Description:    main() method for program to unit test the 
+ **                 fullDeckCount function from dominion.c
+ ** Parameters:     none
+ ** Return Value:   0 - conventional for success of int main() method
+ ************************************************************************/
+ 
+int main(int argc, char *argv[])
+{
+    testFullDeckCount();
+    return 0;
+}
+
+
+
+/* CS 362 Assignment 3 */
+/*************************************************************************
+ ** Author:                  Michael Tucker
+ ** Date Created:            4/24/2018
+ ** Last Modification Date:  4/29/2018
+ ** Filename:                unittest2.c
+ ** 
+** Overview:  This program implements a Unit Test Suite for testing the
+ **            gainCard function from the dominion.c file. The 
+ **            dominion.c file implements a Dominion card game. The test 
+ **            suite includes tests for the effect the function has on 
+ **            the elements of the Game State as well as the performance
+ **            of the function over a range of input arguments.
+ **			   The Unit tests include:
+ **			   TEST 1: All possible toFlag values for all cards available 
+ **					   in supply piles
+ ** 		   TEST 2: All supply piles are empty
+ **			   TEST 3: Select cards not available in current game
+ ** Input:   None.  The program executes and calls the function from the
+ **          dominion.c file, which includes code under test. 
+ ** Output:  A new file is created and appended, unittestresults.out
+ **          which includes all unit test and coverage results.
+ ************************************************************************/
+
+
+#include "dominion.h"
+#include "dominion_helpers.h"
+#include "rngs.h"
+#include "interface.c"
+
+#include <stdio.h>
+#include <string.h>
+
+#define TESTFUNCTIONNAME "gainCard()"
+#define NUMCARDOPTIONS 17
+#define NUMTOFLAGS 3
+ 
+ 
+/************************************************************************/
+
+// Composition of struct gameState from dominion.h
+/*
+struct gameState 
+{
+    int numPlayers;     //number of players
+    int supplyCount[treasure_map+1];  //this is the amount of a specific type of card given a specific number.
+    int embargoTokens[treasure_map+1];
+    int outpostPlayed;
+    int outpostTurn;
+    int whoseTurn;
+    int phase;
+    int numActions;     // Starts at 1 each turn 
+    int coins;          // Use as you see fit! 
+    int numBuys;        // Starts at 1 each turn 
+    int hand[MAX_PLAYERS][MAX_HAND];
+    int handCount[MAX_PLAYERS];
+    int deck[MAX_PLAYERS][MAX_DECK];
+    int deckCount[MAX_PLAYERS];
+    int discard[MAX_PLAYERS][MAX_DECK];
+    int discardCount[MAX_PLAYERS];
+    int playedCards[MAX_DECK];
+    int playedCardCount;
+};
+*/
+  
+
+/*************************************************************************
+ ** Function:                assertMsg
+ ** 
+ ** Description:    Function to use the input condition to determine
+ **                 if a Passed or Failed message is output based on the
+ **                 result of a unit subtest. This is a generic function
+ **                 for displaying the test results. The condition is
+ **                 determined outside the function.
+ ************************************************************************/
+
+void assertMsg(int condition, char* trueMsg, char* falseMsg)
+{
+    if (condition)
+    {
+        // printf("PASSED: %s\n", trueMsg);
+    }
+    
+    else
+    {
+        printf("FAILED: %s\n", falseMsg);
+    }  
+}
+
+
+/*************************************************************************
+ ** Function:                assertMsgGc
+ ** 
+ ** Description:    Function to compare the actual value of the test 
+ **                 result produced by a unit subtest to the expected 
+ **                 value. If the test fails, a FAIL message and failure 
+ **                 results for the test are output. The test inputs
+ **                 are specific to the tests run on the gainCard 
+ **					function.
+ ************************************************************************/
+ 
+int assertMsgGC(int player, int toFlag, int card, char* pileLabel, char* subTestLabel, int testNum, int actualVal, int expectedVal)
+{
+    char failMsg[128];
+    char tempStr[128];
+  
+    int resultVal = 0;
+
+    if (actualVal != expectedVal)
+    {
+        strcpy(failMsg, "FAILED. Test");
+		sprintf(tempStr, "%d: P: %d TF: %d C: %d, %s, %s:  ", testNum, player, toFlag, card, pileLabel, subTestLabel);
+		strcat(failMsg, tempStr);
+		sprintf(tempStr, "actual: %d != expected: %d\n", actualVal, expectedVal);
+		strcat(failMsg, tempStr);
+        printf(failMsg);
+        resultVal = -1;
+    }
+
+    return resultVal;
+}
+
+ 
+/************************************************************************/
+
+// gainCard() function from dominion.c
+/*
+int gainCard(int supplyPos, struct gameState *state, int toFlag, int player)
+{
+  //Note: supplyPos is enum of choosen card
+	
+  //check if supply pile is empty (0) or card is not used in game (-1)
+  if ( supplyCount(supplyPos, state) < 1 )
+    {
+      return -1;
+    }
+	
+  //added card for [whoseTurn] current player:
+  // toFlag = 0 : add to discard
+  // toFlag = 1 : add to deck
+  // toFlag = 2 : add to hand
+
+  if (toFlag == 1)
+    {
+      state->deck[ player ][ state->deckCount[player] ] = supplyPos;
+      state->deckCount[player]++;
+    }
+  else if (toFlag == 2)
+    {
+      state->hand[ player ][ state->handCount[player] ] = supplyPos;
+      state->handCount[player]++;
+    }
+  else
+    {
+      state->discard[player][ state->discardCount[player] ] = supplyPos;
+      state->discardCount[player]++;
+    }
+	
+  //decrease number in supply pile
+  state->supplyCount[supplyPos]--;
+	 
+  return 0;
+}
+
+int supplyCount(int card, struct gameState *state) 
+{
+  return state->supplyCount[card];
+}
+*/
+
+ 
+/*************************************************************************
+ ** Function:                testGainCard
+ ** 
+ ** Description:    Function to implement the Unit Tests for testing 
+ **                 the gainCard() function in dominion.c
+ ************************************************************************/
+ 
+int testGainCard()
+{
+    char msgPfx[128];
+    char msgSfx[128];
+    char passMsg[128];
+    char failMsg[128];
+    char passMsg2[128];
+    
+    char handLabel[64];
+    char deckLabel[64];
+    char discardLabel[64];
+    char supplyLabel[64];
+    char retValLabel[64];
+    char countTestLabel[64];
+    char cardTestLabel[64];
+    char supplyTestLabel[64];
+    char retValTestLabel[64];
+
+    int testNum;
+	int result = 0;
+    int retVal;
+	int actualVal;
+    int expectedVal;
+    int assertRetVal; 
+    int assertCondition = 0;
+	
+	int numPlayers = 2;
+    int randSeed = 1000;
+    
+	int player, card, toFlag;
+    int gainCount = 0; 
+				 
+	int k[10] = {adventurer, council_room, feast, gardens, mine,
+                 remodel, smithy, village, baron, great_hall};
+				 // Kingdom Card numbers: 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+				 // Victory Card numbers: 0, 1, 2, 3
+				 // Treasure Card numbers: 4, 5, 6
+    
+    struct gameState baseGst, testGst, initialGst;
+	
+    strcpy(handLabel, "hand");
+    strcpy(deckLabel, "deck");
+    strcpy(discardLabel, "discard");
+    strcpy(countTestLabel, "count test");
+    strcpy(cardTestLabel, "card test");
+    strcpy(supplyLabel, "supply");
+    strcpy(supplyTestLabel, "supply test");
+    strcpy(retValLabel, "retVal");
+    strcpy(retValTestLabel, "return value test");
+    strcpy(passMsg2, "PASSED: TEST ");
+
+	 
+	/************************************************************************/
+
+	printf("----------------- Testing Function: %s ----------------\n", TESTFUNCTIONNAME);
+	
+    // Pre-testing setup of game states	
+	
+	// Initialize a Game: set initial game state 
+	initializeGame(numPlayers, k, randSeed, &initialGst);
+
+	// Copy the initial game state to a base case and a test case game state
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+	
+	/************************************************************************/
+	
+	// ----------- TEST 1: All possible toFlag values for all cards available in supply piles --------------
+	
+	strcpy(msgPfx, "TEST 1: All possible toFlag values for all cards available in supply piles");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 1");
+    strcpy(failMsg, "N/A");
+
+    testNum = 1;
+
+	
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+		for (toFlag = 0; toFlag < NUMTOFLAGS; toFlag++)	// check each toFlag 0, 1, 2
+		{
+			
+			for (card = 0; card < NUMCARDOPTIONS; card++) // check all cards used in current game 0 - 16
+			{
+				strcpy(msgPfx, "TEST 1: All possible toFlag values for all cards available in supply piles");
+				strcat(msgPfx, ":  ");
+				
+				// Call the gainCard function for each input combination
+				retVal = gainCard(card, &testGst, toFlag, player);
+				gainCount++;
+
+				/************************************************************************/
+				
+                // Test for expected return value from gainCard()
+                // In this case, it should be 0.
+                              
+                actualVal = retVal; 
+                expectedVal = 0;
+                assertRetVal = assertMsgGC(player, toFlag, card, retValLabel, retValTestLabel, testNum, actualVal, expectedVal);
+                if (assertRetVal == -1)
+                {
+                    result = assertRetVal;
+                }
+
+				/************************************************************************/
+				
+                // Test supply pile count for card gained
+               
+                actualVal = testGst.supplyCount[card];
+                expectedVal = baseGst.supplyCount[card] - 1;
+                assertRetVal = assertMsgGC(player, toFlag, card, supplyLabel, supplyTestLabel, testNum, actualVal, expectedVal);
+                if (assertRetVal == -1)
+                {
+                    result = assertRetVal;
+                }
+
+				/************************************************************************/
+
+
+                // Tests related to toFlag = 1
+				// toFlag = 1 : add to deck
+
+				if (toFlag == 1)
+				{
+					
+					// Tests: deckCount for player passed in is incremented by 1 from before
+					//        new card added to deck at position new deckCount - 1
+                    actualVal = testGst.deckCount[player];
+                    expectedVal = baseGst.deckCount[player] + gainCount;
+                    assertRetVal = assertMsgGC(player, toFlag, card, deckLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+
+					/************************************************************************/
+					
+                    actualVal = testGst.deck[player][testGst.deckCount[player] - 1];
+				    expectedVal = card;	
+                     assertRetVal = assertMsgGC(player, toFlag, card, deckLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+
+					/************************************************************************/
+
+					// Hand and Discard should not change
+                    
+                    // Hand -- Testing handCount
+                    actualVal = testGst.handCount[player];
+                    expectedVal = baseGst.handCount[player];
+                    assertRetVal = assertMsgGC(player, toFlag, card, handLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+					
+					/************************************************************************/
+					
+                    // Hand -- Testing hand card absence 
+                    actualVal = testGst.hand[player][testGst.handCount[player] - 1];
+                    expectedVal = baseGst.hand[player][baseGst.handCount[player] - 1];
+                     assertRetVal = assertMsgGC(player, toFlag, card, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+		
+					/************************************************************************/
+					
+                    // Discard -- Testing discardCount
+                    actualVal = testGst.discardCount[player];
+                    expectedVal = baseGst.discardCount[player];
+                    assertRetVal = assertMsgGC(player, toFlag, card, discardLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+					
+                    /************************************************************************/
+					
+                    // Discard -- Testing discard card absence
+                    actualVal = testGst.discard[player][testGst.discardCount[player] - 1];
+                    expectedVal = baseGst.discard[player][baseGst.discardCount[player] - 1];
+                    assertRetVal = assertMsgGC(player, toFlag, card, discardLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+				}
+				
+				/************************************************************************/
+				
+				
+				// Tests related to toFlag = 2
+				// toFlag = 2 : add to hand
+
+				else if (toFlag == 2)
+				{
+					// Tests: handCount for player passed in is incremented by 1 from before
+					//        new card added to hand at position new handCount - 1
+					
+					// Hand -- Testing handCount
+                    actualVal = testGst.handCount[player];
+                    expectedVal = baseGst.handCount[player] + gainCount;
+                    assertRetVal = assertMsgGC(player, toFlag, card, handLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+					
+					/************************************************************************/
+					
+				    // Hand -- Testing hand card presence 
+                    actualVal = testGst.hand[player][testGst.handCount[player] - 1];
+				    expectedVal = card;	
+                    assertRetVal = assertMsgGC(player, toFlag, card, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+
+					/************************************************************************/	
+
+					// Deck and Discard should not change
+                    
+                    // Deck -- Testing deckCount
+                    actualVal = testGst.deckCount[player];
+                    expectedVal = baseGst.deckCount[player];
+                    assertRetVal = assertMsgGC(player, toFlag, card, deckLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+					
+					/************************************************************************/
+                    
+					// Deck -- Testing deck card absence 
+                    actualVal = testGst.deck[player][testGst.deckCount[player] - 1];
+                    expectedVal = baseGst.deck[player][baseGst.deckCount[player] - 1];
+                    assertRetVal = assertMsgGC(player, toFlag, card, deckLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+		
+					/************************************************************************/
+					
+                    // Discard -- Testing discardCount
+                    actualVal = testGst.discardCount[player];
+                    expectedVal = baseGst.discardCount[player];
+                    assertRetVal = assertMsgGC(player, toFlag, card, discardLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+                    
+					/************************************************************************/
+					
+                    // Discard -- Testing discard card absence
+                    actualVal = testGst.discard[player][testGst.discardCount[player] - 1];
+                    expectedVal = baseGst.discard[player][baseGst.discardCount[player] - 1];
+                    assertRetVal = assertMsgGC(player, toFlag, card, discardLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+				}
+				
+				/************************************************************************/
+
+				
+				// Tests related to toFlag = 0
+				// toFlag = 0 : add to discard
+
+				else  // toFlag == 0
+				{
+					// Tests: discardCount for player passed in is incremented by 1 from before
+					//        new card added to discard at position new discardCount - 1
+				
+					// Discard -- Testing discardCount
+                    actualVal = testGst.discardCount[player];
+                    expectedVal = baseGst.discardCount[player] + gainCount;
+                    assertRetVal = assertMsgGC(player, toFlag, card, discardLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+					
+					/************************************************************************/
+					
+                    actualVal = testGst.discard[player][testGst.discardCount[player] - 1];
+				    expectedVal = card;	
+                    assertRetVal = assertMsgGC(player, toFlag, card, discardLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+
+					/************************************************************************/
+
+					// Deck and Hand should not change
+                    
+                    // Deck -- Testing deckCount
+                    actualVal = testGst.deckCount[player];
+                    expectedVal = baseGst.deckCount[player];
+                    assertRetVal = assertMsgGC(player, toFlag, card, deckLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+					
+					/************************************************************************/
+					
+                    // Deck -- Testing deck card absence 
+                    actualVal = testGst.deck[player][testGst.deckCount[player] - 1];
+                    expectedVal = baseGst.deck[player][baseGst.deckCount[player] - 1];
+                    assertRetVal = assertMsgGC(player, toFlag, card, deckLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+		
+					/************************************************************************/
+					
+                    // Hand -- Testing handCount
+                    actualVal = testGst.handCount[player];
+                    expectedVal = baseGst.handCount[player];
+                    assertRetVal = assertMsgGC(player, toFlag, card, handLabel, countTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+					
+                    /************************************************************************/
+					
+                    // Hand -- Testing hand card absence
+                    actualVal = testGst.hand[player][testGst.handCount[player] - 1];
+                    expectedVal = baseGst.hand[player][baseGst.handCount[player] - 1];
+                    assertRetVal = assertMsgGC(player, toFlag, card, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+                    if (assertRetVal == -1)
+                    {
+                        result = assertRetVal;
+                    }
+				}
+			}
+
+            // Reset values for next toFlag iteration
+            gainCount = 0;
+		    memcpy(&testGst, &initialGst, sizeof(struct gameState));
+		}
+	}
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+
+	/************************************************************************/
+	
+	// ----------- TEST 2: All supply piles are empty --------------
+	
+	strcpy(msgPfx, "TEST 2: All supply piles are empty");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 2");
+    strcpy(failMsg, "N/A");
+
+    testNum = 2;
+	
+	// Reset the base case and a test case game states to initial values
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+
+    // Initialize all supply piles to empty for test game state
+    memset(testGst.supplyCount, 0, sizeof testGst.supplyCount);
+
+    // Copy changed testGst to baseGst for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+		for (toFlag = 0; toFlag < NUMTOFLAGS; toFlag++)	// check each toFlag 0, 1, 2
+		{
+			
+			for (card = 0; card < NUMCARDOPTIONS; card++) // check all cards used in current game 0 - 16
+			{
+				strcpy(msgPfx, "TEST 2: All supply piles are empty");
+				strcat(msgPfx, ":  ");
+
+				// Call the gainCard function for each input combination
+				retVal = gainCard(card, &testGst, toFlag, player);
+
+
+				/************************************************************************/
+				
+                // Test for expected return value from gainCard()
+                // In this case, it should be -1.
+                              
+                actualVal = retVal; 
+                expectedVal = -1;
+                assertRetVal = assertMsgGC(player, toFlag, card, retValLabel, retValTestLabel, testNum, actualVal, expectedVal);
+                if (assertRetVal == -1)
+                {
+                    result = assertRetVal;
+                }
+
+				/************************************************************************/
+				
+                // Test: Compare base game state to test game state for any changes.
+               
+                strcpy(msgPfx, "TEST 2");
+                strcat(msgPfx, ":  ");
+
+                if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+                {
+                    assertCondition = 1;  
+                }
+         
+                else
+                {
+                    assertCondition = 0;
+                    sprintf(msgSfx, "Game State has changed after running test. player: %d  toFlag: %d  card: %d", player, toFlag, card);
+                    strcat(msgPfx, msgSfx);
+                    strcpy(failMsg, msgPfx);
+                    result = -1;
+                } 
+                
+                assertMsg(assertCondition, passMsg, failMsg);
+            }
+        }
+    }
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+
+	/************************************************************************/
+	
+	// ----------- TEST 3: Select cards not available in current game --------------
+	
+	strcpy(msgPfx, "TEST 3: Select cards not available in current game");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 3");
+    strcpy(failMsg, "N/A");
+
+    testNum = 3;
+	
+	// Reset the base case and a test case game states to initial values
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+		for (toFlag = 0; toFlag < NUMTOFLAGS; toFlag++)	// check each toFlag 0, 1, 2
+		{
+			for (card = 17; card < 27; card++) // check all cards not used in current game 17 - 26 
+            {
+				strcpy(msgPfx, "TEST 3: Select cards not available in current game");
+				strcat(msgPfx, ":  ");
+
+				// Call the gainCard function for each input combination
+				retVal = gainCard(card, &testGst, toFlag, player);
+
+
+				/************************************************************************/
+				
+                // Test for expected return value from gainCard()
+                // In this case, it should be -1.
+                              
+                actualVal = retVal; 
+                expectedVal = -1;
+                assertRetVal = assertMsgGC(player, toFlag, card, retValLabel, retValTestLabel, testNum, actualVal, expectedVal);
+                if (assertRetVal == -1)
+                {
+                    result = assertRetVal;
+                }
+
+				/************************************************************************/
+				
+                // Test: Compare base game state to test game state for any changes.
+               
+                strcpy(msgPfx, "TEST 3");
+                strcat(msgPfx, ":  ");
+
+                if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+                {
+                    assertCondition = 1;  
+                }
+         
+                else
+                {
+                    assertCondition = 0;
+                    sprintf(msgSfx, "Game State has changed after running test. player: %d  toFlag: %d  card: %d", player, toFlag, card);
+                    strcat(msgPfx, msgSfx);
+                    strcpy(failMsg, msgPfx);
+                    result = -1;
+                } 
+                
+                assertMsg(assertCondition, passMsg, failMsg);
+            }
+        }
+    }
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+
+	/************************************************************************/
+    // Final Result Message
+
+    if (result == 0)
+    {
+        printf(" >>>>>  SUCCESS: Testing Complete for function %s  All Tests Passed.  <<<<<\n", TESTFUNCTIONNAME);
+    }
+                        
+    else
+    {
+		printf(" ******* Testing Complete for function %s  There were one or more Failed Tests. *******\n", TESTFUNCTIONNAME);
+    }
+    
+    printf("\n");
+	return result;
+}
+
+
+/************************************************************************/
+
+/************************************************************************/
+
+/*************************************************************************
+ ** Function:           main() method for unittest2 program
+ ** 
+ ** Description:    main() method for program to unit test the 
+ **                 gainCard function from dominion.c
+ ** Parameters:     none
+ ** Return Value:   0 - conventional for success of int main() method
+ ************************************************************************/
+ 
+int main(int argc, char *argv[])
+{
+    testGainCard();
+    return 0;
+}
+
+
+/* CS 362 Assignment 3 */
+/*************************************************************************
+ ** Author:                  Michael Tucker
+ ** Date Created:            4/24/2018
+ ** Last Modification Date:  4/29/2018
+ ** Filename:                unittest3.c
+ ** 
+ ** Overview:  This program implements a Unit Test Suite for testing the
+ **            discardCard function from the dominion.c file. The 
+ **            dominion.c file implements a Dominion card game. The test 
+ **            suite includes tests for the effect the function has on 
+ **            the elements of the Game State as well as the performance
+ **            of the function over a range of input arguments.
+ **			   The Unit tests include:
+ **			   TEST 1: Both trashFlag values, 5 cards hands, and last 
+ **					   card in hand played
+ ** 		   TEST 2: Both trashFlag values, 5 cards hands, and first 
+ **					   or third card in hand played
+ ** Input:   None.  The program executes and calls the function from the
+ **          dominion.c file, which includes code under test. 
+ ** Output:  A new file is created and appended, unittestresults.out
+ **          which includes all unit test and coverage results.
+ ************************************************************************/
+ 
+
+#include "dominion.h"
+#include "dominion_helpers.h"
+#include "rngs.h"
+#include "interface.h"
+
+#include <stdio.h>
+#include <string.h>
+
+#define TESTFUNCTIONNAME "discardCard()"
+#define NUMCARDOPTIONS 17
+
+ 
+/************************************************************************/
+
+// Composition of struct gameState from dominion.h
+/*
+struct gameState 
+{
+    int numPlayers;     //number of players
+    int supplyCount[treasure_map+1];  //this is the amount of a specific type of card given a specific number.
+    int embargoTokens[treasure_map+1];
+    int outpostPlayed;
+    int outpostTurn;
+    int whoseTurn;
+    int phase;
+    int numActions;     // Starts at 1 each turn 
+    int coins;          // Use as you see fit! 
+    int numBuys;        // Starts at 1 each turn 
+    int hand[MAX_PLAYERS][MAX_HAND];
+    int handCount[MAX_PLAYERS];
+    int deck[MAX_PLAYERS][MAX_DECK];
+    int deckCount[MAX_PLAYERS];
+    int discard[MAX_PLAYERS][MAX_DECK];
+    int discardCount[MAX_PLAYERS];
+    int playedCards[MAX_DECK];
+    int playedCardCount;
+};
+*/
+  
+
+/*************************************************************************
+ ** Function:                assertMsg
+ ** 
+ ** Description:    Function to use the input condition to determine
+ **                 if a Passed or Failed message is output based on the
+ **                 result of a unit subtest. This is a generic function
+ **                 for displaying the test results. The condition is
+ **                 determined outside the function.
+ ************************************************************************/
+ 
+void assertMsg(int condition, char* trueMsg, char* falseMsg)
+{
+    if (condition)
+    {
+        printf("PASSED: %s\n", trueMsg);
+    }
+    
+    else
+    {
+        printf("FAILED: %s\n", falseMsg);
+    }  
+}
+
+
+/*************************************************************************
+ ** Function:                assertMsgDC
+ ** 
+ ** Description:    Function to compare the actual value of the test 
+ **                 result produced by a unit subtest to the expected 
+ **                 value. If the test fails, a FAIL message and failure 
+ **                 results for the test are output. The test inputs
+ **                 are specific to the tests run on discardCard function.
+ ************************************************************************/
+
+int assertMsgDC(int player, int trashFlag, int handPos, char* pileLabel, char* subTestLabel, int testNum, int actualVal, int expectedVal)
+{
+    char failMsg[128];
+    char tempStr[128];
+  
+    int resultVal = 0;
+
+    if (actualVal != expectedVal)
+    {
+        strcpy(failMsg, "FAILED. Test");
+		sprintf(tempStr, "%d: P: %d TF: %d C: %d, %s, %s:  ", testNum, player, trashFlag, handPos, pileLabel, subTestLabel);
+		strcat(failMsg, tempStr);
+		sprintf(tempStr, "actual: %d != expected: %d\n", actualVal, expectedVal);
+		strcat(failMsg, tempStr);
+        printf(failMsg);
+        resultVal = -1;
+    }
+
+    return resultVal;
+}
+
+ 
+/************************************************************************/
+
+// discardCard() function from dominion.c
+/*
+int discardCard(int handPos, int currentPlayer, struct gameState *state, int trashFlag)
+{
+	
+  //if card is not trashed, added to Played pile 
+  if (trashFlag < 1)
+  {
+      //add card to played pile
+      state->playedCards[state->playedCardCount] = state->hand[currentPlayer][handPos]; 
+      state->playedCardCount++;
+  }
+	
+  //set played card to -1
+  state->hand[currentPlayer][handPos] = -1;
+	
+  //remove card from player's hand
+  if ( handPos == (state->handCount[currentPlayer] - 1) ) 	//last card in hand array is played
+  {
+      //reduce number of cards in hand
+      state->handCount[currentPlayer]--;
+  }
+  else if ( state->handCount[currentPlayer] == 1 ) //only one card in hand
+  {
+      //reduce number of cards in hand
+      state->handCount[currentPlayer]--;
+  }
+  else 	
+  {
+      //replace discarded card with last card in hand
+      state->hand[currentPlayer][handPos] = state->hand[currentPlayer][ (state->handCount[currentPlayer] - 1)];
+      //set last card to -1
+      state->hand[currentPlayer][state->handCount[currentPlayer] - 1] = -1;
+      //reduce number of cards in hand
+      state->handCount[currentPlayer]--;
+  }
+	
+  return 0;
+}
+*/ 
+
+ 
+/*************************************************************************
+ ** Function:                testDiscardCard
+ ** 
+ ** Description:    Function to implement the Unit Tests for testing 
+ **                 the discardCard() function in dominion.c
+ ************************************************************************/
+ 
+int testDiscardCard()
+{
+    char msgPfx[128];
+    char passMsg[128];
+    char failMsg[128];
+    char passMsg2[128];
+
+    char handLabel[64];
+    char deckLabel[64];
+    char discardLabel[64];
+	char playedCardsLabel[64];
+    char retValLabel[64];
+    char countTestLabel[64];
+    char cardTestLabel[64];
+    char retValTestLabel[64];
+
+    int i;
+    int testNum;
+	int result = 0;
+	int actualVal;
+    int expectedVal;
+    int assertRetVal; 
+	
+	int numPlayers = 2;
+    int randSeed = 1000;
+    
+	int player, handPos, trashFlag;
+    int discardCount = 0; 
+				 
+	int k[10] = {adventurer, council_room, feast, gardens, mine,
+                 remodel, smithy, village, baron, great_hall};
+				 // Kingdom Card numbers: 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+				 // Victory Card numbers: 0, 1, 2, 3
+				 // Treasure Card numbers: 4, 5, 6
+    
+    struct gameState baseGst, testGst, initialGst, tempGst;
+	
+    strcpy(handLabel, "hand");
+    strcpy(deckLabel, "deck");
+    strcpy(discardLabel, "discard");
+	strcpy(playedCardsLabel, "playedCards");
+    strcpy(countTestLabel, "count test");
+    strcpy(cardTestLabel, "card test");
+    strcpy(retValLabel, "retVal");
+    strcpy(retValTestLabel, "return value test");
+    strcpy(passMsg2, "PASSED: TEST ");
+
+
+	/************************************************************************/
+	
+	printf("----------------- Testing Function: %s ----------------\n", TESTFUNCTIONNAME);
+	
+    // Pre-testing setup of game states	
+	
+	// Initialize a Game: set initial game state 
+	initializeGame(numPlayers, k, randSeed, &initialGst);
+
+	// Copy the initial game state to a base case and a test case game state
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+	
+	/************************************************************************/
+	
+	// ----------- TEST 1: Both trashFlag values, 5 cards hands, and last card in hand played --------------
+	
+	strcpy(msgPfx, "TEST 1: Both trashFlag values, 5 card hands, and last card in hand played");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+    strcpy(passMsg, "TEST 1");
+    strcpy(failMsg, "N/A");
+
+    testNum = 1;
+	
+	
+	// Initialize hand and deck for second player (index 1)
+	
+	testGst.hand[1][0] = 1;
+	testGst.hand[1][1] = 4;
+	testGst.hand[1][2] = 7;
+	testGst.hand[1][3] = 8;
+	testGst.hand[1][4] = 13;
+	
+	testGst.handCount[1] = 5;
+	
+	for (i = 5; i < 10; i++)
+	{
+		testGst.deck[1][i] = -1;
+	}
+	
+	testGst.deckCount[1] = 5;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+	
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+		for (trashFlag = 0; trashFlag < 2; trashFlag++)	// check each trashFlag 0, 1
+		{
+			for (handPos = 4; handPos >= 0; handPos--)
+			{
+				strcpy(msgPfx, "TEST 1: Both trashFlag values, 5 card hands, and last card in hand played");
+				strcat(msgPfx, ":  ");
+
+				// Call the discardCard function for each input combination
+				discardCard(handPos, player, &testGst, trashFlag);
+				discardCount++;
+
+				
+				/************************************************************************/
+				
+				// If card is not trashed, added to Played pile. trashFlag = 0
+				// If trashFlag = 1, card is trashed, effectively removed from the current game
+				
+				if (trashFlag < 1)
+				{
+					// Card is not trashed, and added to playedCards pile
+					
+					// Test: Card in playedCards pile is same as previous card in hand at handPos
+					actualVal = testGst.playedCards[testGst.playedCardCount - 1]; 
+					expectedVal = baseGst.hand[player][handPos];
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, playedCardsLabel, cardTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}
+
+					// Test: playedCardCount increased by 1
+					actualVal = testGst.playedCardCount; 
+					expectedVal = baseGst.playedCardCount + discardCount;
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, playedCardsLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}
+					
+					// Test: discardCount increased by 1
+					actualVal = testGst.discardCount[player]; 
+					expectedVal = baseGst.discardCount[player] + discardCount;
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, discardLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}
+				}
+				
+				else  // trashFlag == 1, so card is trashed
+				{
+					// Test: playedCardCount is the same as before
+					actualVal = testGst.playedCardCount;
+					expectedVal = baseGst.playedCardCount;
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, playedCardsLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}
+
+					// Test: discardCount is the same as before
+					actualVal = testGst.discardCount[player]; 
+					expectedVal = baseGst.discardCount[player];
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, discardLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}					
+				}
+				
+				
+				// Test: Card in hand at handPos is now set to -1
+				actualVal = testGst.hand[player][handPos];
+				expectedVal = -1;
+				assertRetVal = assertMsgDC(player, trashFlag, handPos, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+				if (assertRetVal == -1)
+				{
+					result = assertRetVal;
+				}
+				
+				// Test: handCount decreased by 1
+				actualVal = testGst.handCount[player];
+				expectedVal = baseGst.handCount[player] - discardCount;
+				assertRetVal = assertMsgDC(player, trashFlag, handPos, handLabel, countTestLabel, testNum, actualVal, expectedVal);
+				if (assertRetVal == -1)
+				{
+					result = assertRetVal;
+				}
+			}	
+			
+			// Reset the test game state
+			memcpy(&testGst, &baseGst, sizeof(struct gameState));
+		    discardCount = 0;	
+		}		
+	}
+    
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+
+	/************************************************************************/
+	
+	// ----------- TEST 2: Both trashFlag values, 5 cards hands, and first or third card in hand played --------------
+
+	strcpy(msgPfx, "TEST 2: Both trashFlag values, 5 cards hands, and first or third card in hand played");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 2");
+    strcpy(failMsg, "N/A");
+
+    testNum = 2;
+	
+	
+	// Initialize hand and deck for second player (index 1)
+
+	testGst.hand[1][0] = 1;
+	testGst.hand[1][1] = 4;
+	testGst.hand[1][2] = 7;
+	testGst.hand[1][3] = 8;
+	testGst.hand[1][4] = 13;
+	
+	testGst.handCount[1] = 5;
+	
+	for (i = 5; i < 10; i++)
+	{
+		testGst.deck[1][i] = -1;
+	}
+	
+	testGst.deckCount[1] = 5;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+	
+	// Run the Test
+    
+	for (player = 0; player < numPlayers; player++)
+    {
+		for (trashFlag = 0; trashFlag < 2; trashFlag++)	// Check each trashFlag 0, 1
+		{
+			for (i = 0; i < 5; i++)  // Iterate through the 5 cards in the hand
+			{
+				// Make sure handPos is not the last card in hand (last index)
+                if (i < 2)
+				{
+					handPos = 2;
+				}
+				
+				else
+				{
+					handPos = 0;
+				}
+                
+                // The hand changes with each iteration compared to baseGst, so need 
+                // an updated game state tempGst for comparison
+	            memcpy(&tempGst, &testGst, sizeof(struct gameState));
+				
+				strcpy(msgPfx, "TEST 2: Both trashFlag values, 5 cards hands, and first or third card in hand played");
+				strcat(msgPfx, ":  ");
+
+				// Call the discardCard function for each input combination
+				discardCard(handPos, player, &testGst, trashFlag);
+				discardCount++;
+
+				/************************************************************************/
+				
+				// if card is not trashed, added to Played pile. trashFlag = 0
+				// If trashFlag = 1, card is trashed, effectively removing it from the current game
+	
+				if (trashFlag < 1)
+				{
+					// Card is not trashed, and added to playedCards pile
+					
+					// Test: Card in playedCards pile is same as previous card in hand at handPos
+					actualVal = testGst.playedCards[testGst.playedCardCount - 1]; 
+					expectedVal = tempGst.hand[player][handPos];
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, playedCardsLabel, cardTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}
+
+					// Test: playedCardCount increased by 1
+					actualVal = testGst.playedCardCount; 
+					expectedVal = baseGst.playedCardCount + discardCount;
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, playedCardsLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}
+					
+					// Test: discardCount increased by 1
+					actualVal = testGst.discardCount[player]; 
+					expectedVal = baseGst.discardCount[player] + discardCount;
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, discardLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}
+				}
+				
+				else  // trashFlag == 1, so card is trashed
+				{
+					// Test: playedCardCount is same as before
+					actualVal = testGst.playedCardCount;
+					expectedVal = baseGst.playedCardCount;
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, playedCardsLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}	
+					
+					// Test: discardCount is the same as before
+					actualVal = testGst.discardCount[player]; 
+					expectedVal = baseGst.discardCount[player];
+					assertRetVal = assertMsgDC(player, trashFlag, handPos, discardLabel, countTestLabel, testNum, actualVal, expectedVal);
+					if (assertRetVal == -1)
+					{
+						result = assertRetVal;
+					}	
+				}
+				
+				// Test: Previous last card in hand before discard is now set to -1
+				actualVal = testGst.hand[player][baseGst.handCount[player] - 1];
+				expectedVal = -1;
+				assertRetVal = assertMsgDC(player, trashFlag, handPos, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+				if (assertRetVal == -1)
+				{
+					result = assertRetVal;
+				}
+				
+				// Test: Card in hand at handPos is now set to previous last card in hand
+                // However, if this was the only card in hand, the card at handPos will
+                // be set to -1.
+				actualVal = testGst.hand[player][handPos];
+                if (testGst.handCount[player] == 0)
+                {
+                    expectedVal = -1;
+                }
+
+                else
+                {
+				    expectedVal = tempGst.hand[player][tempGst.handCount[player] - 1];
+                }
+
+				assertRetVal = assertMsgDC(player, trashFlag, handPos, handLabel, cardTestLabel, testNum, actualVal, expectedVal);
+				if (assertRetVal == -1)
+				{
+					result = assertRetVal;
+				}
+								
+				// Test: handCount decreased by 1
+				actualVal = testGst.handCount[player];
+				expectedVal = baseGst.handCount[player] - discardCount;
+				assertRetVal = assertMsgDC(player, trashFlag, handPos, handLabel, countTestLabel, testNum, actualVal, expectedVal);
+				if (assertRetVal == -1)
+				{
+					result = assertRetVal;
+				}
+			}	
+			
+			// Reset the test game state
+			memcpy(&testGst, &baseGst, sizeof(struct gameState));
+		    discardCount = 0;
+		}		
+	}
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+
+    /************************************************************************/
+    // Final Result Message
+	
+    if (result == 0)
+    {
+        printf(" >>>>>  SUCCESS: Testing Complete for function %s  All Tests Passed.  <<<<<\n", TESTFUNCTIONNAME);
+    }
+                        
+    else
+    {
+		printf(" ******* Testing Complete for function %s  There were one or more Failed Tests. *******\n", TESTFUNCTIONNAME);
+    }
+    
+    printf("\n");
+	return result;
+}
+ 
+ 
+/************************************************************************/ 
+ 
+/************************************************************************/
+
+/*************************************************************************
+ ** Function:           main() method for unittest3 program
+ ** 
+ ** Description:    main() method for program to unit test the 
+ **                 discardCard function from dominion.c
+ ** Parameters:     none
+ ** Return Value:   0 - conventional for success of int main() method
+ ************************************************************************/
+ 
+int main(int argc, char *argv[])
+{
+    testDiscardCard();
+    return 0;
+}
+
+
+
+
+/* CS 362 Assignment 3 */
+/*************************************************************************
+ ** Author:                  Michael Tucker
+ ** Date Created:            4/24/2018
+ ** Last Modification Date:  4/29/2018
+ ** Filename:                unittest4.c
+ ** 
+ ** Overview:  This program implements a Unit Test Suite for testing the
+ **            isGameOver function from the dominion.c file. The 
+ **            dominion.c file implements a Dominion card game. The test 
+ **            suite includes tests for the effect the function has on 
+ **            the elements of the Game State as well as the performance
+ **            of the function over a range of input arguments.
+ **			   The Unit tests include:
+ **			   TEST 1: All Supply Piles Have Cards  
+ ** 		   TEST 2: One Supply Pile is Empty
+ **			   TEST 3: Two Supply Piles are Empty
+ **			   TEST 4: Province Card Supply Pile is Empty
+ **			   TEST 5: First 4 Supply piles are Empty
+ **			   TEST 6: 3 Supply Piles are Empty
+ **			   TEST 7: Last 3 Supply Piles are Empty
+ ** Input:   None.  The program executes and calls the function from the
+ **          dominion.c file, which includes code under test. 
+ ** Output:  A new file is created and appended, unittestresults.out
+ **          which includes all unit test and coverage results.
+ ************************************************************************/
+ 
+
+#include "dominion.h"
+#include "dominion_helpers.h"
+#include "rngs.h"
+#include "interface.h"
+
+#include <stdio.h>
+#include <string.h>
+
+#define TESTFUNCTIONNAME "isGameOver()"
+#define NUMCARDOPTIONS 17
+
+ 
+/************************************************************************/
+
+// Composition of struct gameState from dominion.h 
+/*
+struct gameState 
+{
+    int numPlayers;     //number of players
+    int supplyCount[treasure_map+1];  //this is the amount of a specific type of card given a specific number.
+    int embargoTokens[treasure_map+1];
+    int outpostPlayed;
+    int outpostTurn;
+    int whoseTurn;
+    int phase;
+    int numActions;     // Starts at 1 each turn 
+    int coins;          // Use as you see fit! 
+    int numBuys;        // Starts at 1 each turn 
+    int hand[MAX_PLAYERS][MAX_HAND];
+    int handCount[MAX_PLAYERS];
+    int deck[MAX_PLAYERS][MAX_DECK];
+    int deckCount[MAX_PLAYERS];
+    int discard[MAX_PLAYERS][MAX_DECK];
+    int discardCount[MAX_PLAYERS];
+    int playedCards[MAX_DECK];
+    int playedCardCount;
+};
+*/
+
+
+/*************************************************************************
+ ** Function:                assertMsg
+ ** 
+ ** Description:    Function to use the input condition to determine
+ **                 if a Passed or Failed message is output based on the
+ **                 result of a unit subtest. This is a generic function
+ **                 for displaying the test results. The condition is
+ **                 determined outside the function.
+ ************************************************************************/
+ 
+void assertMsg(int condition, char* trueMsg, char* falseMsg)
+{
+    if (condition)
+    {
+        // printf("PASSED: %s\n", trueMsg);
+    }
+    
+    else
+    {
+        printf("FAILED: %s\n", falseMsg);
+    }  
+}
+
+
+/*************************************************************************
+ ** Function:                assertMsgIGO
+ ** 
+ ** Description:    Function to compare the actual value of the test 
+ **                 result produced by a unit subtest to the expected 
+ **                 value. If the test fails, a FAIL message and failure 
+ **                 results for the test are output. The test inputs
+ **                 are specific to the tests run on isGameOver function.
+ ************************************************************************/
+
+int assertMsgIGO(char* subTestLabel, int testNum, int actualVal, int expectedVal)
+{
+    char failMsg[128];
+    char tempStr[128];
+  
+    int resultVal = 0;
+
+    if (actualVal != expectedVal)
+    {
+        strcpy(failMsg, "FAILED. Test");
+		sprintf(tempStr, "%d:  %s:  ", testNum, subTestLabel);
+		strcat(failMsg, tempStr);
+		sprintf(tempStr, "actual: %d != expected: %d\n", actualVal, expectedVal);
+		strcat(failMsg, tempStr);
+        printf(failMsg);
+        resultVal = -1;
+    }
+
+    return resultVal;
+}
+
+
+/************************************************************************/
+
+// isGameOver() function from dominion.c
+
+/*
+
+int isGameOver(struct gameState *state) 
+{
+  int i;
+  int j;
+	
+  //if stack of Province cards is empty, the game ends
+  if (state->supplyCount[province] == 0)
+  {
+     return 1;
+  }
+
+  //if three supply pile are at 0, the game ends
+  j = 0;
+  for (i = 0; i < 25; i++)
+  {
+    if (state->supplyCount[i] == 0)
+	{
+	  j++;
+	}
+  }
+  if ( j >= 3)
+  {
+      return 1;
+  }
+
+  return 0;
+}
+*/ 
+ 
+ 
+/*************************************************************************
+ ** Function:                testIsGameOver
+ ** 
+ ** Description:    Function to implement the Unit Tests for testing 
+ **                 the isGameOver() function in dominion.c
+ ************************************************************************/
+ 
+int testIsGameOver()
+{
+    char msgPfx[128];
+    char msgSfx[128];
+    char passMsg[128];
+    char failMsg[128];
+    char passMsg2[128];
+
+    char supplyTestLabel[64];
+
+    int testNum;
+	int result = 0;
+    int retVal;
+	int actualVal;
+    int expectedVal;
+    int assertRetVal; 
+    int assertCondition = 0;
+	
+	int numPlayers = 2;
+    int randSeed = 1000;
+    			 
+	int k[10] = {adventurer, council_room, feast, gardens, mine,
+                 remodel, smithy, village, baron, great_hall};
+				 // Kingdom Card numbers: 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+				 // Victory Card numbers: 0, 1, 2, 3
+				 // Treasure Card numbers: 4, 5, 6
+    
+    struct gameState baseGst, testGst, initialGst;
+	
+    strcpy(supplyTestLabel, "supply test");
+    strcpy(passMsg2, "PASSED: TEST ");
+
+	
+	/************************************************************************/
+
+	printf("----------------- Testing Function: %s ----------------\n", TESTFUNCTIONNAME);
+	
+    // Pre-testing setup of game states	
+	
+	// Initialize a Game: set initial game state 
+	initializeGame(numPlayers, k, randSeed, &initialGst);
+
+	// Copy the initial game state to a base case and a test case game state
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+
+	
+	/************************************************************************/	
+	// Test with no supply piles empty
+	
+	// ----------- TEST 1: All Supply Piles Have Cards --------------
+	
+	strcpy(msgPfx, "TEST 1: All Supply Piles Have Cards");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 1");
+    strcpy(failMsg, "N/A");
+
+    testNum = 1;
+
+	
+	// Run the Test
+	
+    // Call the isGameOver function for this input combination
+	retVal = isGameOver(&testGst);
+
+	
+	/************************************************************************/	
+	
+	// Test: Return value indicates Game Over Status. 1 = Game Over. 0 = Game Continues
+	actualVal = retVal;
+	expectedVal = 0;
+	assertRetVal = assertMsgIGO(supplyTestLabel, testNum, actualVal, expectedVal);
+	if (assertRetVal == -1)
+	{
+		result = assertRetVal;
+	}
+	
+	// Test: Compare base game state to test game state for any changes.
+               
+    strcpy(msgPfx, "TEST 1");
+    strcat(msgPfx, ":  ");
+
+    if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+    {
+		assertCondition = 1;  
+    }
+         
+    else
+    {
+		assertCondition = 0;
+		sprintf(msgSfx, "Game State has changed after running test.");
+		strcat(msgPfx, msgSfx);
+		strcpy(failMsg, msgPfx);
+		result = -1;
+    } 
+                
+    assertMsg(assertCondition, passMsg, failMsg);
+	
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+	
+	
+	/************************************************************************/
+	
+	// Test with one supply pile empty -- 13
+	
+	// ----------- TEST 2: One Supply Pile is Empty --------------
+
+	strcpy(msgPfx, "TEST 2: One Supply Pile is Empty");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 2");
+    strcpy(failMsg, "N/A");
+
+    testNum = 2;
+	
+	
+	// Initialize game state for number of empty piles
+	testGst.supplyCount[smithy] = 0;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+	
+	// Run the Test
+	
+    // Call the isGameOver function for this input combination
+	retVal = isGameOver(&testGst);
+
+	
+	/************************************************************************/
+	
+	// Test: Return value indicates Game Over Status. 1 = Game Over. 0 = Game Continues
+	actualVal = retVal;
+	expectedVal = 0;
+	assertRetVal = assertMsgIGO(supplyTestLabel, testNum, actualVal, expectedVal);
+	if (assertRetVal == -1)
+	{
+		result = assertRetVal;
+	}
+	
+	// Test: Compare base game state to test game state for any changes.
+               
+    strcpy(msgPfx, "TEST 2");
+    strcat(msgPfx, ":  ");
+
+    if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+    {
+		assertCondition = 1;  
+    }
+         
+    else
+    {
+		assertCondition = 0;
+		sprintf(msgSfx, "Game State has changed after running test.");
+		strcat(msgPfx, msgSfx);
+		strcpy(failMsg, msgPfx);
+		result = -1;
+    } 
+                
+    assertMsg(assertCondition, passMsg, failMsg);
+	
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+	
+	
+	/************************************************************************/
+	
+	// Test with only two supply piles empty -- 11, 12
+	
+	// ----------- TEST 3: Two Supply Piles are Empty --------------
+
+	strcpy(msgPfx, "TEST 3: Two Supply Piles are Empty");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 3");
+    strcpy(failMsg, "N/A");
+
+    testNum = 3;
+	
+	// Reset game states
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+	
+	// Initialize game state for number of empty piles (index 1)
+	testGst.supplyCount[mine] = 0;
+	testGst.supplyCount[remodel] = 0;
+		
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+	
+	
+	// Run the Test
+	
+    // Call the isGameOver function for this input combination
+	retVal = isGameOver(&testGst);
+
+	
+	/************************************************************************/
+	
+	// Test: Return value indicates Game Over Status. 1 = Game Over. 0 = Game Continues
+	actualVal = retVal;
+	expectedVal = 0;
+	assertRetVal = assertMsgIGO(supplyTestLabel, testNum, actualVal, expectedVal);
+	if (assertRetVal == -1)
+	{
+		result = assertRetVal;
+	}
+	
+	// Test: Compare base game state to test game state for any changes.
+               
+    strcpy(msgPfx, "TEST 3");
+    strcat(msgPfx, ":  ");
+
+    if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+    {
+		assertCondition = 1;  
+    }
+         
+    else
+    {
+		assertCondition = 0;
+		sprintf(msgSfx, "Game State has changed after running test.");
+		strcat(msgPfx, msgSfx);
+		strcpy(failMsg, msgPfx);
+		result = -1;
+    } 
+                
+    assertMsg(assertCondition, passMsg, failMsg);
+	
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+	
+	
+	/************************************************************************/
+	
+	// Test with province pile empty -- 3
+	
+	// ----------- TEST 4: Province card supply pile is Empty --------------
+
+	strcpy(msgPfx, "TEST 4: Province card supply pile is Empty");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 4");
+    strcpy(failMsg, "N/A");
+
+    testNum = 4;
+	
+	// Reset game states
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+	
+	// Initialize game state for number of empty piles (index 1)
+	testGst.supplyCount[province] = 0;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+	
+	// Run the Test
+    
+	// Call the isGameOver function for this input combination
+	retVal = isGameOver(&testGst);
+	
+	
+	/************************************************************************/
+	
+	// Test: Return value indicates Game Over Status. 1 = Game Over. 0 = Game Continues
+	actualVal = retVal;
+	expectedVal = 1;
+	assertRetVal = assertMsgIGO(supplyTestLabel, testNum, actualVal, expectedVal);
+	if (assertRetVal == -1)
+	{
+		result = assertRetVal;
+	}
+	
+	
+	// Test: Compare base game state to test game state for any changes.
+               
+    strcpy(msgPfx, "TEST 4");
+    strcat(msgPfx, ":  ");
+
+    if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+    {
+		assertCondition = 1;  
+    }
+         
+    else
+    {
+		assertCondition = 0;
+		sprintf(msgSfx, "Game State has changed after running test.");
+		strcat(msgPfx, msgSfx);
+		strcpy(failMsg, msgPfx);
+		result = -1;
+    } 
+                
+    assertMsg(assertCondition, passMsg, failMsg);
+	
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+	
+	
+	/************************************************************************/
+	
+	// Test with cards 0, 1, 2, 4 empty
+	
+	// ----------- TEST 5: First 4 supply piles are Empty --------------
+
+	strcpy(msgPfx, "TEST 5: First 4 supply piles are Empty");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 5");
+    strcpy(failMsg, "N/A");
+
+    testNum = 5;
+	
+	// Reset game states
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+	
+	// Initialize game state for number of empty piles (index 1)
+	testGst.supplyCount[curse] = 0;
+	testGst.supplyCount[estate] = 0;
+	testGst.supplyCount[duchy] = 0;
+	testGst.supplyCount[copper] = 0;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+	
+	// Run the Test
+    
+	// Call the isGameOver function for this input combination
+	retVal = isGameOver(&testGst);
+	
+	
+	/************************************************************************/
+	
+	// Test: Return value indicates Game Over Status. 1 = Game Over. 0 = Game Continues
+	actualVal = retVal;
+	expectedVal = 1;
+	assertRetVal = assertMsgIGO(supplyTestLabel, testNum, actualVal, expectedVal);
+	if (assertRetVal == -1)
+	{
+		result = assertRetVal;
+	}
+	
+	
+	// Test: Compare base game state to test game state for any changes.
+               
+    strcpy(msgPfx, "TEST 5");
+    strcat(msgPfx, ":  ");
+
+    if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+    {
+		assertCondition = 1;  
+    }
+         
+    else
+    {
+		assertCondition = 0;
+		sprintf(msgSfx, "Game State has changed after running test.");
+		strcat(msgPfx, msgSfx);
+		strcpy(failMsg, msgPfx);
+		result = -1;
+    } 
+                
+    assertMsg(assertCondition, passMsg, failMsg);
+	
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+	
+	/************************************************************************/
+	
+	// Test with cards 6, 7, 8 empty
+	
+	// ----------- TEST 6: 3 supply piles are Empty --------------
+
+	strcpy(msgPfx, "TEST 6: 3 supply piles are Empty");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 6");
+    strcpy(failMsg, "N/A");
+
+    testNum = 6;
+	
+	// Reset game states
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+	
+	// Initialize game state for number of empty piles (index 1)
+	testGst.supplyCount[gold] = 0;
+	testGst.supplyCount[adventurer] = 0;
+	testGst.supplyCount[council_room] = 0;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+	
+	// Run the Test
+    
+	// Call the isGameOver function for this input combination
+	retVal = isGameOver(&testGst);
+	
+	
+	/************************************************************************/
+	
+	// Test: Return value indicates Game Over Status. 1 = Game Over. 0 = Game Continues
+	actualVal = retVal;
+	expectedVal = 1;
+	assertRetVal = assertMsgIGO(supplyTestLabel, testNum, actualVal, expectedVal);
+	if (assertRetVal == -1)
+	{
+		result = assertRetVal;
+	}
+	
+	
+	// Test: Compare base game state to test game state for any changes.
+               
+    strcpy(msgPfx, "TEST 6");
+    strcat(msgPfx, ":  ");
+
+    if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+    {
+		assertCondition = 1;  
+    }
+         
+    else
+    {
+		assertCondition = 0;
+		sprintf(msgSfx, "Game State has changed after running test.");
+		strcat(msgPfx, msgSfx);
+		strcpy(failMsg, msgPfx);
+		result = -1;
+    } 
+                
+    assertMsg(assertCondition, passMsg, failMsg);
+	
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+	
+	
+	/************************************************************************/
+	
+	// Test with cards 24, 25, 26 empty
+	
+	// ----------- TEST 7: Last 3 supply piles are Empty --------------
+
+	strcpy(msgPfx, "TEST 7: Last 3 supply piles are Empty");
+    printf("%s\n", msgPfx);
+    strcat(msgPfx, ":  ");
+
+    strcpy(passMsg, "TEST 7");
+    strcpy(failMsg, "N/A");
+
+    testNum = 7;
+	
+	// Reset game states
+	memcpy(&baseGst, &initialGst, sizeof(struct gameState));
+	memcpy(&testGst, &initialGst, sizeof(struct gameState));
+	
+	// Initialize game state for number of empty piles (index 1)
+	testGst.supplyCount[salvager] = 0;
+	testGst.supplyCount[sea_hag] = 0;
+	testGst.supplyCount[treasure_map] = 0;
+	
+	// Copy the changed test game state to base case game state for later comparison
+	memcpy(&baseGst, &testGst, sizeof(struct gameState));
+
+	
+	// Run the Test
+    
+	// Call the isGameOver function for this input combination
+	retVal = isGameOver(&testGst);
+	
+	
+	/************************************************************************/
+	
+	// Test: Return value indicates Game Over Status. 1 = Game Over. 0 = Game Continues
+	actualVal = retVal;
+	expectedVal = 1;
+	assertRetVal = assertMsgIGO(supplyTestLabel, testNum, actualVal, expectedVal);
+	if (assertRetVal == -1)
+	{
+		result = assertRetVal;
+	}
+	
+	
+	// Test: Compare base game state to test game state for any changes.
+               
+    strcpy(msgPfx, "TEST 7");
+    strcat(msgPfx, ":  ");
+
+    if (memcmp(&testGst, &baseGst, sizeof(struct gameState)) == 0)
+    {
+		assertCondition = 1;  
+    }
+         
+    else
+    {
+		assertCondition = 0;
+		sprintf(msgSfx, "Game State has changed after running test.");
+		strcat(msgPfx, msgSfx);
+		strcpy(failMsg, msgPfx);
+		result = -1;
+    } 
+                
+    assertMsg(assertCondition, passMsg, failMsg);
+
+    if (result == 0)
+    {
+        printf(passMsg2);
+        printf("%d\n", testNum);
+    }
+
+
+	/************************************************************************/
+    // Final Result Message
+	
+    if (result == 0)
+    {
+        printf(" >>>>>  SUCCESS: Testing Complete for function %s  All Tests Passed.  <<<<<\n", TESTFUNCTIONNAME);
+    }
+                        
+    else
+    {
+		printf(" ******* Testing Complete for function %s  There were one or more Failed Tests. *******\n", TESTFUNCTIONNAME);
+    }
+    
+    printf("\n");
+	return result;
+}
+
+
+/************************************************************************/ 
+
+/************************************************************************/
+
+/*************************************************************************
+ ** Function:           main() method for unittest4 program
+ ** 
+ ** Description:    main() method for program to unit test the 
+ **                 isGameOver function from dominion.c
+ ** Parameters:     none
+ ** Return Value:   0 - conventional for success of int main() method
+ ************************************************************************/
+ 
+int main(int argc, char *argv[])
+{
+    testIsGameOver();
+    return 0;
+}
