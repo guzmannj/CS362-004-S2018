@@ -21,7 +21,18 @@ public class UrlValidatorTest extends TestCase {
    //runs isValid() method and compares result to expected
    public void manualHelper(String url, UrlValidator urlVal, boolean expected)
    {
-	   boolean result = urlVal.isValid(url);
+	   boolean result = false;
+	   
+	   try {
+	   		result = urlVal.isValid(url);
+	   } 
+	   catch (Exception except) {
+	   		System.out.println("\n     Exception: " + except);
+	   }
+	   catch (Error error) {
+	   		System.out.println("\n     Error: " + error);
+	   }	
+	   
 	   System.out.printf("URL: '%s', Expected: %b, Result: %b; ", url, expected, result);
 	   
 	   if (expected == result) System.out.println("TEST PASSED!");
@@ -49,11 +60,11 @@ public class UrlValidatorTest extends TestCase {
 	   
 	   //causes failure and will exit program
 	   expected = true;
-	   //manualHelper("ftp://www.google.com", urlVal, expected);
+	   manualHelper("ftp://www.google.com", urlVal, expected);
 	   
 	   //causes crashing when running
 	   expected = true;
-	   //manualHelper("h3t://www.google.com", urlVal, expected);
+	   manualHelper("h3t://www.google.com", urlVal, expected);
 	   
 	   //testing different authorities
 	   expected = true;
@@ -76,7 +87,7 @@ public class UrlValidatorTest extends TestCase {
 	   
 	   //doesn't allow empty authority with file, but does with http
 	   expected = true;
-	   //manualHelper("file://", urlVal, expected);
+	   manualHelper("file://", urlVal, expected);
 	   
 	   //testing URL ports
 	   expected = true;
@@ -152,6 +163,8 @@ public class UrlValidatorTest extends TestCase {
        int testPassed = 0;
        int testFailed = 0;
        
+       boolean result = false;
+       
        //Loop to check for test cases
        for(i = 0; i < totalLength; i++){
            
@@ -161,9 +174,18 @@ public class UrlValidatorTest extends TestCase {
                //Check the url string
                String[] stringURL = {"" + checkAccept[outerLen] + "www.oregonstate.edu"};
            
-               
                //Valid test should pass
-               if(urlVal.isValid(stringURL[0])){
+        	   try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	   } 
+        	   catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	   }
+        	   catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	   }
+        	   
+               if(result){
                    
                    //For passed test cases
                    testPassed = testPassed + 1;
@@ -188,7 +210,17 @@ public class UrlValidatorTest extends TestCase {
                 String[] stringURL = {"" + checkReject[innerLen] + "www.oregonstate.edu"};
                 
                 //Invalid test should fail
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		     result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			 System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+        	    	 System.out.println("\n     Error: " + error);
+        	    }
+         	    
+                if(result){
                     
                     //For failed test
                     System.out.println("Test Failed for URL (Incorrect Accept): " + stringURL[0]);
@@ -247,6 +279,8 @@ public class UrlValidatorTest extends TestCase {
         int testPassed = 0;
         int testFailed = 0;
         
+        boolean result = false;
+        
         //Loop to check for test cases
         for(i = 0; i < totalLength; i++){
             
@@ -258,7 +292,17 @@ public class UrlValidatorTest extends TestCase {
                 
                 
                 //Valid test should pass
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	    }
+         	    
+                if(result){
                     
                     //For passed test cases
                     testPassed = testPassed + 1;
@@ -283,7 +327,17 @@ public class UrlValidatorTest extends TestCase {
                 String[] stringURL = {"http://" + checkReject[innerLen] + ""};
                 
                 //Invalid test should fail
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	    }
+         	   
+                if(result){
                     
                     //For failed test
                     System.out.println("Test Failed for URL (Incorrect Accept): " + stringURL[0]);
@@ -338,6 +392,8 @@ public class UrlValidatorTest extends TestCase {
         int innerLen = 0;
         int outerLen = 0;
         
+        boolean result = false;
+        
         //Count for test passed and failed
         int testPassed = 0;
         int testFailed = 0;
@@ -353,7 +409,17 @@ public class UrlValidatorTest extends TestCase {
                 
                 
                 //Valid test should pass
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	    }
+         	   
+                if(result){
                     
                     //For passed test cases
                     testPassed = testPassed + 1;
@@ -378,7 +444,17 @@ public class UrlValidatorTest extends TestCase {
                 String[] stringURL = {"http://www.oregonstate.edu" + checkReject[innerLen] + ""};
                 
                 //Invalid test should fail
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		    result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			 System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			 System.out.println("\n     Error: " + error);
+        	    }
+         	    
+                if(result){
                     
                     //For failed test
                     System.out.println("Test Failed for URL (Incorrect Accept): " + stringURL[0]);
@@ -434,6 +510,8 @@ public class UrlValidatorTest extends TestCase {
         int testPassed = 0;
         int testFailed = 0;
         
+        boolean result = false;
+        
         //Loop to check for test cases
         for(i = 0; i < totalLength; i++){
             
@@ -445,7 +523,17 @@ public class UrlValidatorTest extends TestCase {
                 
                 
                 //Valid test should pass
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	    }
+         	   
+                if(result){
                     
                     //For passed test cases
                     testPassed = testPassed + 1;
@@ -470,7 +558,17 @@ public class UrlValidatorTest extends TestCase {
                 String[] stringURL = {"http://www.oregonstate.edu" + checkReject[innerLen] + ""};
                 
                 //Invalid test should fail
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	    }
+         	    
+                if(result){
                     
                     //For failed test
                     System.out.println("Test Failed for URL (Incorrect Accept): " + stringURL[0]);
@@ -526,6 +624,8 @@ public class UrlValidatorTest extends TestCase {
         int testPassed = 0;
         int testFailed = 0;
         
+        boolean result = false;
+        
         //Loop to check for test cases
         for(i = 0; i < totalLength; i++){
             
@@ -537,7 +637,17 @@ public class UrlValidatorTest extends TestCase {
                 
                 
                 //Valid test should pass
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	    }
+         	    
+                if(result){
                     
                     //For passed test cases
                     testPassed = testPassed + 1;
@@ -562,7 +672,17 @@ public class UrlValidatorTest extends TestCase {
                 String[] stringURL = {"http://www.oregonstate.edu" + checkReject[innerLen] + ""};
                 
                 //Invalid test should fail
-                if(urlVal.isValid(stringURL[0])){
+         	    try {
+        		   result = urlVal.isValid(stringURL[0]);
+        	    } 
+        	    catch (Exception except) {
+       	   			System.out.println("\n     Exception: " + except);
+        	    }
+        	    catch (Error error) {
+       	   			System.out.println("\n     Error: " + error);
+        	    }
+         	   
+                if(result){
                     
                     //For failed test
                     System.out.println("Test Failed for URL (Incorrect Accept): " + stringURL[0]);
@@ -612,6 +732,8 @@ public class UrlValidatorTest extends TestCase {
 	   String[][] urlParts = {scheme, hostname, domain, topDomain, path};	//Holds array components
 	   Boolean[][] urlExpected = {schemeExpected, hostnameExpected, domainExpected, topDomainExpected, pathExpected};  //Holds expected boolean values
 	   
+	   boolean result = false;
+	   
 	   for (int j=0; j<50; j++) {
 		   String testUrl = "";		//Reset Url string
 		   Boolean expected = true;
@@ -622,7 +744,17 @@ public class UrlValidatorTest extends TestCase {
 			   testUrl += urlParts[i][n];					
 			   expected = expected && urlExpected[i][n];	//Aggregate boolean logic determines overall expected value
 		   }
-		   boolean result = urlVal.isValid(testUrl);		//Checks if testUrl is a valid url address
+		   		
+    	   try {
+    		   result = urlVal.isValid(testUrl);	//Checks if testUrl is a valid url address
+    	   } 
+    	   catch (Exception except) {
+   	   			System.out.println("\n     Exception: " + except);
+    	   }
+    	   catch (Error error) {
+   	   			System.out.println("\n     Error: " + error);
+    	   }
+		   
 		   //Testing Oracle
 		   System.out.printf("URL: '%s', Expected: %b, Result: %b; ", testUrl, expected, result);
 		   if (expected == result) System.out.println("TEST PASSED!");
