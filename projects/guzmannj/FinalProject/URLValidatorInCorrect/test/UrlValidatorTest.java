@@ -746,7 +746,7 @@ public class UrlValidatorTest extends TestCase {
 		   }
 		   		
     	   try {
-    		   result = urlVal.isValid(testUrl);	//Checks if testUrl is a valid url address
+                result = urlVal.isValid(testUrl);	//Checks if testUrl is a valid url address
     	   } 
     	   catch (Exception except) {
    	   			System.out.println("\n     Exception: " + except);
